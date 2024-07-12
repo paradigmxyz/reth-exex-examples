@@ -1,4 +1,4 @@
-use example_exex_remote::proto::{
+use remote::proto::{
     remote_ex_ex_server::{RemoteExEx, RemoteExExServer},
     ExExNotification as ProtoExExNotification, SubscribeRequest as ProtoSubscribeRequest,
 };
