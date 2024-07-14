@@ -1,6 +1,11 @@
 [workspace]
 members = [
+  "discv5",
+  "in-memory-state",
+  "minimal",
+  "op-bridge",
   "remote",
+  "rollup",
 ]
 resolver = "2"
 
@@ -14,16 +19,31 @@ publish = false
 [workspace.dependencies]
 # reth
 reth = { git = "https://github.com/paradigmxyz/reth" }
+reth-chainspec = { git = "https://github.com/paradigmxyz/reth" }
+reth-discv5 = { git = "https://github.com/paradigmxyz/reth" }
+reth-execution-errors = { git = "https://github.com/paradigmxyz/reth" }
+reth-execution-types = { git = "https://github.com/paradigmxyz/reth" }
 reth-exex = { git = "https://github.com/paradigmxyz/reth", features = ["serde"] }
+reth-network-peers = { git = "https://github.com/paradigmxyz/reth" }
 reth-node-api = { git = "https://github.com/paradigmxyz/reth" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth" }
+reth-provider = { git = "https://github.com/paradigmxyz/reth" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth" }
 reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
 
+# alloy
+alloy-sol-types = { version = "0.7", features = ["json"] }
+
 # async
+futures = "0.3"
+futures-util = "0.3"
 tokio = { version = "1.0", features = ["full"] }
+tokio-stream = "0.1"
 
 # misc
 eyre = "0.6"
 
 # testing
 reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth" }
+reth-testing-utils = { git = "https://github.com/paradigmxyz/reth" }
