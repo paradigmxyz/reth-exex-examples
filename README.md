@@ -13,12 +13,12 @@ for new developers.
 
 | Example                              | Description                                                                | Run                                                                                                                                                  |
 | ------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Remote](./remote)                   | Emits notifications using a gRPC server, and a consumer that receives them | `cargo run --bin remote-exex -- node` to start Reth node with the ExEx and a gRPC server<br>`cargo run --bin remote-consumer` to start a gRPC client |
+| [Discv5](./discv5)                   | Runs discv5 discovery stack                                                | `cargo run --bin discv5`                                                                                                                             |
 | [In Memory State](./in-memory-state) | Tracks the plain state in memory                                           | `cargo run --bin in-memory-state -- node`                                                                                                            |
 | [Minimal](./minimal)                 | Logs every chain commit, reorg and revert notification                     | `cargo run --bin minimal -- node`                                                                                                                    |
 | [OP Bridge](./op-bridge)             | Decodes Optimism deposit and withdrawal receipts from L1                   | `cargo run --bin op-bridge -- node`                                                                                                                  |
+| [Remote](./remote)                   | Emits notifications using a gRPC server, and a consumer that receives them | `cargo run --bin remote-exex -- node` to start Reth node with the ExEx and a gRPC server<br>`cargo run --bin remote-consumer` to start a gRPC client |
 | [Rollup](./rollup)                   | Rollup that derives the state from L1                                      | `cargo run --bin rollup -- node`                                                                                                                     |
-| [Discv5](./discv5)                   | Runs discv5 discovery stack                                                | `cargo run --bin discv5`                                                                                                                             |
 
 #### License
 
