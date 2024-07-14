@@ -6,6 +6,7 @@ members = [
   "op-bridge",
   "remote",
   "rollup",
+  "stealth-addresses"
 ]
 resolver = "2"
 
@@ -20,12 +21,16 @@ publish = false
 # reth
 reth = { git = "https://github.com/paradigmxyz/reth" }
 reth-chainspec = { git = "https://github.com/paradigmxyz/reth" }
+reth-cli-commands = { git = "https://github.com/paradigmxyz/reth" }
+reth-cli-runner = { git = "https://github.com/paradigmxyz/reth" }
+reth-db = { git = "https://github.com/paradigmxyz/reth" }
 reth-discv5 = { git = "https://github.com/paradigmxyz/reth" }
 reth-execution-errors = { git = "https://github.com/paradigmxyz/reth" }
 reth-execution-types = { git = "https://github.com/paradigmxyz/reth" }
 reth-exex = { git = "https://github.com/paradigmxyz/reth", features = ["serde"] }
 reth-network-peers = { git = "https://github.com/paradigmxyz/reth" }
 reth-node-api = { git = "https://github.com/paradigmxyz/reth" }
+reth-node-builder = { git = "https://github.com/paradigmxyz/reth" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth" }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth" }
 reth-provider = { git = "https://github.com/paradigmxyz/reth" }
@@ -33,6 +38,7 @@ reth-revm = { git = "https://github.com/paradigmxyz/reth" }
 reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
 
 # alloy
+alloy-primitives = "0.7"
 alloy-sol-types = { version = "0.7", features = ["json"] }
 
 # async
@@ -42,6 +48,7 @@ tokio = { version = "1.0", features = ["full"] }
 tokio-stream = "0.1"
 
 # misc
+clap = "4"
 eyre = "0.6"
 
 # testing
