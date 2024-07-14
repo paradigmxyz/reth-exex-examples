@@ -81,6 +81,7 @@ message Transaction {
     TransactionEip2930 eip2930 = 4;
     TransactionEip1559 eip1559 = 5;
     TransactionEip4844 eip4844 = 6;
+    TransactionEip7702 eip7702 = 7;
   }
 }
 
@@ -137,6 +138,19 @@ message TransactionEip4844 {
   bytes input = 11;
 }
 
+message TransactionEip7702 {
+  uint64 chain_id = 1;
+  uint64 nonce = 2;
+  uint64 gas_limit = 3;
+  bytes max_fee_per_gas = 4;
+  bytes max_priority_fee_per_gas = 5;
+  TxKind to = 6;
+  bytes value = 7;
+  repeated AccessListItem access_list = 8;
+  repeated AuthorizationListItem authorization_list = 9;
+  bytes input = 10;
+}
+
 message TxKind {
   oneof kind {
     google.protobuf.Empty create = 1;
@@ -147,6 +161,17 @@ message TxKind {
 message AccessListItem {
   bytes address = 1;
   repeated bytes storage_keys = 2;
+}
+
+message AuthorizationListItem {
+  Authorization authorization = 1;
+  Signature signature = 2;
+}
+
+message Authorization {
+  uint64 chain_id = 1;
+  bytes address = 2;
+  optional uint64 nonce = 3;
 }
 
 message ExecutionOutcome {
@@ -266,6 +291,7 @@ enum TxType {
   EIP2930 = 1;
   EIP1559 = 2;
   EIP4844 = 3;
+  EIP7702 = 4;
 }
 
 message Log {

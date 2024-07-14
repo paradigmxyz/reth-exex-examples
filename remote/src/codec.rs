@@ -230,6 +230,43 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
                 max_fee_per_blob_gas: max_fee_per_blob_gas.to_le_bytes().to_vec(),
                 input: input.to_vec(),
             }),
+            reth::primitives::Transaction::Eip7702(reth::primitives::TxEip7702 {
+                chain_id,
+                nonce,
+                gas_limit,
+                max_fee_per_gas,
+                max_priority_fee_per_gas,
+                to,
+                value,
+                access_list,
+                authorization_list,
+                input,
+            }) => proto::transaction::Transaction::Eip7702(proto::TransactionEip7702 {
+                chain_id: *chain_id,
+                nonce: *nonce,
+                gas_limit: *gas_limit,
+                max_fee_per_gas: max_fee_per_gas.to_le_bytes().to_vec(),
+                max_priority_fee_per_gas: max_priority_fee_per_gas.to_le_bytes().to_vec(),
+                to: Some(to.into()),
+                value: value.to_le_bytes_vec(),
+                access_list: access_list.iter().map(Into::into).collect(),
+                authorization_list: authorization_list
+                    .iter()
+                    .map(|authorization| proto::AuthorizationListItem {
+                        authorization: Some(proto::Authorization {
+                            chain_id: authorization.chain_id(),
+                            address: authorization.address().to_vec(),
+                            nonce: authorization.nonce(),
+                        }),
+                        signature: Some(proto::Signature {
+                            r: authorization.signature().r().to_le_bytes_vec(),
+                            s: authorization.signature().s().to_le_bytes_vec(),
+                            odd_y_parity: authorization.signature().v().y_parity(),
+                        }),
+                    })
+                    .collect(),
+                input: input.to_vec(),
+            }),
             #[cfg(feature = "optimism")]
             reth::primitives::Transaction::Deposit(_) => {
                 eyre::bail!("deposit transaction not supported")
@@ -419,6 +456,7 @@ impl TryFrom<&reth::primitives::Receipt> for proto::NonEmptyReceipt {
                 reth::primitives::TxType::Eip2930 => proto::TxType::Eip2930,
                 reth::primitives::TxType::Eip1559 => proto::TxType::Eip1559,
                 reth::primitives::TxType::Eip4844 => proto::TxType::Eip4844,
+                reth::primitives::TxType::Eip7702 => proto::TxType::Eip7702,
                 #[cfg(feature = "optimism")]
                 reth::primitives::TxType::Deposit => {
                     eyre::bail!("deposit transaction not supported")
@@ -724,6 +762,59 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
                 ),
                 input: input.to_vec().into(),
             }),
+            proto::transaction::Transaction::Eip7702(proto::TransactionEip7702 {
+                chain_id,
+                nonce,
+                gas_limit,
+                max_fee_per_gas,
+                max_priority_fee_per_gas,
+                to,
+                value,
+                access_list,
+                authorization_list,
+                input,
+            }) => reth::primitives::Transaction::Eip7702(reth::primitives::TxEip7702 {
+                chain_id: *chain_id,
+                nonce: *nonce,
+                gas_limit: *gas_limit,
+                max_fee_per_gas: u128::from_le_bytes(max_fee_per_gas.as_slice().try_into()?),
+                max_priority_fee_per_gas: u128::from_le_bytes(
+                    max_priority_fee_per_gas.as_slice().try_into()?,
+                ),
+                to: to.as_ref().ok_or_eyre("no to")?.try_into()?,
+                value: U256::try_from_le_slice(value.as_slice())
+                    .ok_or_eyre("failed to parse value")?,
+                access_list: access_list
+                    .iter()
+                    .map(TryInto::try_into)
+                    .collect::<eyre::Result<Vec<_>>>()?
+                    .into(),
+                authorization_list: authorization_list
+                    .iter()
+                    .map(|authorization| {
+                        let signature =
+                            authorization.signature.as_ref().ok_or_eyre("no signature")?;
+                        let signature =
+                            reth::primitives::alloy_primitives::Signature::from_rs_and_parity(
+                                U256::try_from_le_slice(signature.r.as_slice())
+                                    .ok_or_eyre("failed to parse r")?,
+                                U256::try_from_le_slice(signature.s.as_slice())
+                                    .ok_or_eyre("failed to parse s")?,
+                                signature.odd_y_parity,
+                            )?;
+
+                        let authorization =
+                            authorization.authorization.as_ref().ok_or_eyre("no authorization")?;
+                        Ok(reth::primitives::eip7702::Authorization {
+                            chain_id: authorization.chain_id,
+                            address: Address::try_from(authorization.address.as_slice())?,
+                            nonce: authorization.nonce.into(),
+                        }
+                        .into_signed(signature))
+                    })
+                    .collect::<eyre::Result<Vec<_>>>()?,
+                input: input.to_vec().into(),
+            }),
         };
 
         Ok(reth::primitives::TransactionSigned { hash, signature, transaction })
@@ -932,6 +1023,7 @@ impl TryFrom<&proto::NonEmptyReceipt> for reth::primitives::Receipt {
                 proto::TxType::Eip2930 => reth::primitives::TxType::Eip2930,
                 proto::TxType::Eip1559 => reth::primitives::TxType::Eip1559,
                 proto::TxType::Eip4844 => reth::primitives::TxType::Eip4844,
+                proto::TxType::Eip7702 => reth::primitives::TxType::Eip7702,
             },
             success: receipt.success,
             cumulative_gas_used: receipt.cumulative_gas_used,
