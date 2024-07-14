@@ -76,7 +76,7 @@ impl Future for DiscV5ExEx {
 #[cfg(test)]
 mod tests {
     use crate::network::DiscV5ExEx;
-    use reth_tracing::info;
+    use reth_tracing::tracing::info;
 
     #[tokio::test]
     async fn can_establish_discv5_session_with_peer() {
