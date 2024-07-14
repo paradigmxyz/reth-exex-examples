@@ -19,6 +19,7 @@ for new developers.
 | [OP Bridge](./op-bridge)             | Decodes Optimism deposit and withdrawal receipts from L1                   | `cargo run --bin op-bridge -- node`                                                                                                                  |
 | [Remote](./remote)                   | Emits notifications using a gRPC server, and a consumer that receives them | `cargo run --bin remote-exex -- node` to start Reth node with the ExEx and a gRPC server<br>`cargo run --bin remote-consumer` to start a gRPC client |
 | [Rollup](./rollup)                   | Rollup that derives the state from L1                                      | `cargo run --bin rollup -- node`                                                                                                                     |
+| [Stealth Addresses](./stealth-addresses)                   | Scans committed blocks for stealth addresses                                                | `cargo run --bin stealthy`                                                                                                                             |
 
 #### License
 
