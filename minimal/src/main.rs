@@ -37,7 +37,7 @@ async fn exex<Node: FullNodeComponents>(mut ctx: ExExContext<Node>) -> eyre::Res
         }
     }
 
-    Ok(())
+    eyre::bail!("channel closed")
 }
 
 fn main() -> eyre::Result<()> {

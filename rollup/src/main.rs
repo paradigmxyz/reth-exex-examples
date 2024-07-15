@@ -63,7 +63,7 @@ impl<Node: FullNodeComponents> Rollup<Node> {
             }
         }
 
-        Ok(())
+        eyre::bail!("channel closed")
     }
 
     /// Process a new chain commit.

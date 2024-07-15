@@ -49,7 +49,7 @@ async fn exex<Node: FullNodeComponents>(
         let _ = notifications.send(notification);
     }
 
-    Ok(())
+    eyre::bail!("channel closed")
 }
 
 fn main() -> eyre::Result<()> {

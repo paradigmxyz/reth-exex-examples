@@ -202,7 +202,7 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
         }
     }
 
-    Ok(())
+    eyre::bail!("channel closed")
 }
 
 /// Decode chain of blocks into a flattened list of receipt logs, and filter only

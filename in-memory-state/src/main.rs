@@ -55,7 +55,7 @@ impl<Node: FullNodeComponents + Unpin> Future for InMemoryStateExEx<Node> {
             }
         }
 
-        Poll::Ready(Ok(()))
+        Poll::Ready(Err(eyre::eyre!("channel closed")))
     }
 }
 
