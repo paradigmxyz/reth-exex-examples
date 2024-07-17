@@ -9,6 +9,5 @@ license.workspace = true
 reth-tracing.workspace = true
 
 once_cell = "1"
-tracing-appender = "0.2"
 wee_alloc = "0.4"
 

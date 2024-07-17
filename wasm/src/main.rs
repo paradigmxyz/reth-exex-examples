@@ -1,9 +1,10 @@
 mod rpc;
 mod wasm;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use jsonrpsee::core::RpcResult;
+use reth::dirs::{LogsDir, PlatformPath};
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
@@ -17,9 +18,11 @@ use wasmtime::{Engine, Linker, Module};
 struct WasmExEx<Node: FullNodeComponents> {
     ctx: ExExContext<Node>,
     rpc_messages: mpsc::UnboundedReceiver<(RpcMessage, oneshot::Sender<RpcResult<()>>)>,
+    logs_directory: PathBuf,
 
     engine: Engine,
     linker: Linker<WasiCtx>,
+
     installed_exexes: HashMap<String, Module>,
     running_exexes: HashMap<String, RunningExEx>,
 }
@@ -28,6 +31,7 @@ impl<Node: FullNodeComponents> WasmExEx<Node> {
     fn new(
         ctx: ExExContext<Node>,
         rpc_messages: mpsc::UnboundedReceiver<(RpcMessage, oneshot::Sender<RpcResult<()>>)>,
+        logs_directory: PathBuf,
     ) -> eyre::Result<Self> {
         let engine = Engine::default();
         let mut linker = Linker::<WasiCtx>::new(&engine);
@@ -37,6 +41,7 @@ impl<Node: FullNodeComponents> WasmExEx<Node> {
         Ok(Self {
             ctx,
             rpc_messages,
+            logs_directory,
             engine,
             linker,
             installed_exexes: HashMap::new(),
@@ -63,8 +68,8 @@ impl<Node: FullNodeComponents> WasmExEx<Node> {
         let committed_chain_tip = notification.committed_chain().map(|chain| chain.tip().number);
 
         for exex in self.running_exexes.values_mut() {
-            if let Err(err) = exex.handle_notification(&notification) {
-                error!(name = %exex.name, %err, "failed to handle notification")
+            if let Err(err) = exex.process_notification(&notification) {
+                error!(name = %exex.name, %err, "failed to process notification")
             }
         }
 
@@ -91,10 +96,16 @@ impl<Node: FullNodeComponents> WasmExEx<Node> {
                     .get(name)
                     .ok_or_else(|| rpc_internal_error_format!("ExEx {name} not installed"))?;
 
-                let exex = RunningExEx::new(name.clone(), &self.engine, module, &self.linker)
-                    .map_err(|err| {
-                        rpc_internal_error_format!("failed to create exex for {name}: {err}")
-                    })?;
+                let exex = RunningExEx::new(
+                    name.clone(),
+                    &self.engine,
+                    module,
+                    &self.linker,
+                    &self.logs_directory,
+                )
+                .map_err(|err| {
+                    rpc_internal_error_format!("failed to create exex for {name}: {err}")
+                })?;
 
                 self.running_exexes.insert(name.clone(), exex);
             }
@@ -122,21 +133,28 @@ fn main() -> eyre::Result<()> {
                 ctx.modules.merge_configured(ExExRpcExt { to_exex: rpc_tx }.into_rpc())?;
                 Ok(())
             })
-            .install_exex("Minimal", |ctx| async move { Ok(WasmExEx::new(ctx, rpc_rx)?.start()) })
+            .install_exex("Minimal", |ctx| async move {
+                // TODO(alexey): obviously bad but we don't have access to log args in the context
+                let logs_directory = PlatformPath::<LogsDir>::default()
+                    .with_chain(ctx.config.chain.chain, ctx.config.datadir.clone())
+                    .as_ref()
+                    .to_path_buf();
+                Ok(WasmExEx::new(ctx, rpc_rx, logs_directory)?.start())
+            })
             .launch()
             .await?;
 
         let (tx, rx) = oneshot::channel();
         rpc_tx_clone.send((
             RpcMessage::Install(
-                "Cool".to_string(),
+                "Wasm".to_string(),
                 // std::fs::read("target/wasm32-unknown-unknown/debug/wasm-exex.wasm")?,
                 std::fs::read("target/wasm32-wasi/debug/wasm-exex.wasm")?,
             ),
             tx,
         ))?;
         let _ = rx.await?;
-        rpc_tx_clone.send((RpcMessage::Start("Cool".to_string()), oneshot::channel().0))?;
+        rpc_tx_clone.send((RpcMessage::Start("Wasm".to_string()), oneshot::channel().0))?;
 
         handle.wait_for_node_exit().await
     })
