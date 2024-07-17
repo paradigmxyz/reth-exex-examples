@@ -125,7 +125,6 @@ impl<Node: FullNodeComponents> WasmExEx<Node> {
 fn main() -> eyre::Result<()> {
     reth::cli::Cli::parse_args().run(|builder, _| async move {
         let (rpc_tx, rpc_rx) = mpsc::unbounded_channel();
-        let rpc_tx_clone = rpc_tx.clone();
 
         let handle = builder
             .node(EthereumNode::default())
@@ -143,18 +142,6 @@ fn main() -> eyre::Result<()> {
             })
             .launch()
             .await?;
-
-        let (tx, rx) = oneshot::channel();
-        rpc_tx_clone.send((
-            RpcMessage::Install(
-                "Wasm".to_string(),
-                // std::fs::read("target/wasm32-unknown-unknown/debug/wasm-exex.wasm")?,
-                std::fs::read("target/wasm32-wasi/debug/wasm-exex.wasm")?,
-            ),
-            tx,
-        ))?;
-        let _ = rx.await?;
-        rpc_tx_clone.send((RpcMessage::Start("Wasm".to_string()), oneshot::channel().0))?;
 
         handle.wait_for_node_exit().await
     })
