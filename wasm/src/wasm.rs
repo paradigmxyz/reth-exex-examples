@@ -52,6 +52,9 @@ impl RunningExEx {
     }
 
     /// Processes an [`ExExNotification`] using the WASM instance.
+    // TODO(alexey): we can probably use shared memory here to avoid copying the data into every
+    // WASM instance memory. I tried it for a while and it didn't work straight away. Maybe we can
+    // share a portion of linear memory, but the rest is up to the WASM instance to manage?
     pub fn process_notification(
         &mut self,
         notification: &reth_exex::ExExNotification,
