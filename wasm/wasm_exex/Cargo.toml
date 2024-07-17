@@ -1,0 +1,14 @@
+[package]
+name = "wasm-exex"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+reth-tracing.workspace = true
+
+once_cell = "1"
+tracing-appender = "0.2"
+wee_alloc = "0.4"
+
