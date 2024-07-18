@@ -178,7 +178,6 @@ dependencies = [
  "alloy-rlp",
  "alloy-serde 0.1.4",
  "c-kzg",
- "derive_more",
  "once_cell",
  "serde",
  "sha2 0.10.8",
@@ -200,17 +199,6 @@ dependencies = [
  "once_cell",
  "serde",
  "sha2 0.10.8",
-]
-
-[[package]]
-name = "alloy-genesis"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bca15afde1b6d15e3fc1c97421262b1bbb37aee45752e3c8b6d6f13f776554ff"
-dependencies = [
- "alloy-primitives",
- "alloy-serde 0.1.4",
- "serde",
 ]
 
 [[package]]
@@ -414,7 +402,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "137f0014c3a61ccc5168289fcc214d7296c389c0bf60425c0f898cff1d7e4bec"
 dependencies = [
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "alloy-primitives",
  "serde",
  "serde_json",
@@ -2712,9 +2700,9 @@ dependencies = [
 
 [[package]]
 name = "foundry-blob-explorers"
-version = "0.1.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "195bb5b228e1215c50d828f3e7d48a809a0af2bc0120462710ea5e7fcba3cbe2"
+checksum = "753c1ac681e3489cb10eedb0765032338913b7847aabcaf3fefd810f6b03712d"
 dependencies = [
  "alloy-chains",
  "alloy-eips 0.1.4",
@@ -5850,7 +5838,7 @@ source = "git+https://github.com/paradigmxyz/reth#390f30aadebcdd509e72cc04327c3b
 dependencies = [
  "alloy-chains",
  "alloy-eips 0.2.0",
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "alloy-primitives",
  "alloy-trie",
  "derive_more",
@@ -5957,7 +5945,7 @@ source = "git+https://github.com/paradigmxyz/reth#390f30aadebcdd509e72cc04327c3b
 dependencies = [
  "alloy-consensus 0.2.0",
  "alloy-eips 0.2.0",
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "alloy-primitives",
  "alloy-trie",
  "bytes",
@@ -6091,7 +6079,7 @@ name = "reth-db-common"
 version = "1.0.3"
 source = "git+https://github.com/paradigmxyz/reth#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "boyer-moore-magiclen",
  "eyre",
  "reth-chainspec",
@@ -6357,7 +6345,7 @@ version = "1.0.3"
 source = "git+https://github.com/paradigmxyz/reth#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
  "alloy-chains",
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "alloy-rlp",
  "bytes",
  "derive_more",
@@ -6926,7 +6914,7 @@ name = "reth-node-core"
 version = "1.0.3"
 source = "git+https://github.com/paradigmxyz/reth#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "alloy-rpc-types-engine",
  "clap",
  "const_format",
@@ -7089,7 +7077,7 @@ name = "reth-optimism-cli"
 version = "1.0.3"
 source = "git+https://github.com/paradigmxyz/reth#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "alloy-primitives",
  "alloy-rlp",
  "clap",
@@ -7247,7 +7235,7 @@ version = "1.0.3"
 source = "git+https://github.com/paradigmxyz/reth#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
  "alloy-eips 0.2.0",
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-rpc-types",
@@ -7280,7 +7268,7 @@ source = "git+https://github.com/paradigmxyz/reth#390f30aadebcdd509e72cc04327c3b
 dependencies = [
  "alloy-consensus 0.2.0",
  "alloy-eips 0.2.0",
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-rpc-types-eth 0.2.0",
@@ -7400,7 +7388,7 @@ version = "1.0.3"
 source = "git+https://github.com/paradigmxyz/reth#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
  "alloy-dyn-abi",
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "alloy-primitives",
  "alloy-rlp",
  "async-trait",
@@ -7802,7 +7790,7 @@ name = "reth-testing-utils"
 version = "1.0.3"
 source = "git+https://github.com/paradigmxyz/reth#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "rand 0.8.5",
  "reth-primitives",
  "secp256k1",
@@ -7895,7 +7883,7 @@ version = "1.0.3"
 source = "git+https://github.com/paradigmxyz/reth#390f30aadebcdd509e72cc04327c3b854de076a6"
 dependencies = [
  "alloy-consensus 0.2.0",
- "alloy-genesis 0.2.0",
+ "alloy-genesis",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-trie",
@@ -8100,8 +8088,7 @@ dependencies = [
 name = "rollup"
 version = "0.0.0"
 dependencies = [
- "alloy-consensus 0.1.4",
- "alloy-genesis 0.1.4",
+ "alloy-consensus 0.2.0",
  "alloy-rlp",
  "alloy-sol-types",
  "eyre",
