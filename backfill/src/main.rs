@@ -15,14 +15,19 @@ use reth_node_ethereum::EthereumNode;
 use reth_tracing::tracing::{error, info};
 use tokio::sync::mpsc;
 
+/// The ExEx that consumes new [`ExExNotification`]s and processes new backfill requests by
+/// [`BackfillRpcExt`].
 struct BackfillExEx<Node: FullNodeComponents> {
+    /// The context of the ExEx.
     ctx: ExExContext<Node>,
+    /// Receiver for backfill requests.
     backfill_rx: mpsc::UnboundedReceiver<RangeInclusive<BlockNumber>>,
-
+    /// Factory for backfill jobs.
     backfill_job_factory: BackfillJobFactory<Node::Executor, Node::Provider>,
 }
 
 impl<Node: FullNodeComponents> BackfillExEx<Node> {
+    /// Creates a new instance of the ExEx.
     fn new(
         ctx: ExExContext<Node>,
         backfill_rx: mpsc::UnboundedReceiver<RangeInclusive<BlockNumber>>,
@@ -32,6 +37,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         Self { ctx, backfill_rx, backfill_job_factory }
     }
 
+    /// Starts listening for notifications and backfill requests.
     async fn start(mut self) -> eyre::Result<()> {
         loop {
             tokio::select! {
@@ -45,6 +51,8 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         }
     }
 
+    /// Processes the given notification and calls [`Self::process_committed_chain`] for every
+    /// committed chain.
     async fn process_notification(&self, notification: ExExNotification) -> eyre::Result<()> {
         match &notification {
             ExExNotification::ChainCommitted { new } => {
@@ -67,8 +75,8 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         Ok(())
     }
 
-    /// Processes the committed blocks and logs the number of blocks and transactions in the chain.
-    async fn process_committed_chain(&self, chain: &Chain) -> eyre::Result<()> {
+    /// Processes the committed chain and logs the number of blocks and transactions.
+    pub async fn process_committed_chain(&self, chain: &Chain) -> eyre::Result<()> {
         // Calculate the number of blocks and transactions in the committed chain
         let blocks = chain.blocks().len();
         let transactions = chain.blocks().values().map(|block| block.body.len()).sum::<usize>();
@@ -77,11 +85,17 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         Ok(())
     }
 
+    /// Backfills the given range of blocks in parallel, calling the
+    /// [`Self::process_committed_chain`] method for each block.
     async fn backfill(&self, range: RangeInclusive<BlockNumber>) -> eyre::Result<()> {
         self.backfill_job_factory
+            // Create a backfill job for the given range
             .backfill(range)
+            // Convert the backfill job into a parallel stream
             .into_stream()
+            // Covert the block execution error into `eyre`
             .map_err(Into::into)
+            // Process each block, returning early if an error occurs
             .try_for_each(|(block, output)| async {
                 let sealed_block = block.seal_slow();
                 let execution_outcome = ExecutionOutcome::new(
@@ -101,11 +115,15 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
 
 #[rpc(server, namespace = "backfill")]
 trait BackfillRpcExtApi {
+    /// Starts backfilling the given range of blocks asynchronously.
     #[method(name = "start")]
     async fn start(&self, from_block: BlockNumber, to_block: BlockNumber) -> RpcResult<()>;
 }
 
+/// The RPC module that exposes the backfill RPC methods and sends backfill requests to
+/// [`BackfillExEx`].
 struct BackfillRpcExt {
+    /// Sender for backfill requests.
     backfill_tx: mpsc::UnboundedSender<RangeInclusive<BlockNumber>>,
 }
 
@@ -120,14 +138,18 @@ impl BackfillRpcExtApiServer for BackfillRpcExt {
 
 fn main() -> eyre::Result<()> {
     reth::cli::Cli::parse_args().run(|builder, _| async move {
+        // Create a channel for backfill requests. Sender will go to the RPC server, receiver will
+        // be used by the ExEx.
         let (backfill_tx, backfill_rx) = mpsc::unbounded_channel();
 
         let handle = builder
             .node(EthereumNode::default())
+            // Extend the RPC server with the backfill RPC module.
             .extend_rpc_modules(move |ctx| {
                 ctx.modules.merge_configured(BackfillRpcExt { backfill_tx }.into_rpc())?;
                 Ok(())
             })
+            // Install the backfill ExEx.
             .install_exex("Backfill", |ctx| async move {
                 Ok(BackfillExEx::new(ctx, backfill_rx).start())
             })
