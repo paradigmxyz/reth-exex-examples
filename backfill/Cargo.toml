@@ -22,8 +22,3 @@ tokio.workspace = true
 # rpc
 async-trait = "0.1"
 jsonrpsee = { version = "0.23", features = ["server", "macros"] }
-
-[dev-dependencies]
-reth-exex-test-utils.workspace = true
-
-tokio.workspace = true

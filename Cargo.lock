@@ -1104,7 +1104,6 @@ dependencies = [
  "reth",
  "reth-execution-types",
  "reth-exex",
- "reth-exex-test-utils",
  "reth-node-api",
  "reth-node-ethereum",
  "reth-tracing",
