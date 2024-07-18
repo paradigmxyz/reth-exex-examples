@@ -7,8 +7,8 @@ use jsonrpsee::{
     proc_macros::rpc,
     types::{error::INTERNAL_ERROR_CODE, ErrorObject},
 };
-use reth::primitives::{BlockNumber, Requests, SealedBlockWithSenders};
-use reth_execution_types::ExecutionOutcome;
+use reth::primitives::{BlockNumber, Requests};
+use reth_execution_types::{Chain, ExecutionOutcome};
 use reth_exex::{BackfillJobFactory, ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
@@ -59,11 +59,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         };
 
         if let Some(committed_chain) = notification.committed_chain() {
-            self.process_committed_blocks(
-                committed_chain.blocks().values(),
-                committed_chain.execution_outcome(),
-            )
-            .await?;
+            self.process_committed_chain(&committed_chain).await?;
 
             self.ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
         }
@@ -71,18 +67,13 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         Ok(())
     }
 
-    async fn process_committed_blocks(
-        &self,
-        blocks: impl IntoIterator<Item = &SealedBlockWithSenders>,
-        outcome: &ExecutionOutcome,
-    ) -> eyre::Result<()> {
-        let (blocks, transactions) =
-            blocks.into_iter().fold((0, 0), |(mut blocks, mut transactions), block| {
-                blocks += 1;
-                transactions += block.body.len();
-                (blocks, transactions)
-            });
-        info!(first_block = %outcome.first_block, %blocks, %transactions, "Processed committed blocks");
+    /// Processes the committed blocks and logs the number of blocks and transactions in the chain.
+    async fn process_committed_chain(&self, chain: &Chain) -> eyre::Result<()> {
+        // Calculate the number of blocks and transactions in the committed chain
+        let blocks = chain.blocks().len();
+        let transactions = chain.blocks().values().map(|block| block.body.len()).sum::<usize>();
+
+        info!(first_block = %chain.execution_outcome().first_block, %blocks, %transactions, "Processed committed blocks");
         Ok(())
     }
 
@@ -99,7 +90,10 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
                     sealed_block.number,
                     vec![Requests(output.requests)],
                 );
-                self.process_committed_blocks([&sealed_block], &execution_outcome).await
+                let chain = Chain::new([sealed_block], execution_outcome, None);
+
+                // Process the committed blocks
+                self.process_committed_chain(&chain).await
             })
             .await
     }
