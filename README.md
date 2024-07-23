@@ -1,6 +1,6 @@
 # Reth Execution Extension (ExEx) Examples
 
-This repository is a collection of [ExEx](https://reth.rs/developer./exex.html) examples
+This repository is a collection of [ExEx](https://reth.rs/developers/exex/exex.html) examples
 built on [Reth](https://github.com/paradigmxyz/reth) that demonstrates common patterns and may serve as an inspiration
 for new developers.
 
