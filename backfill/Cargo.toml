@@ -22,3 +22,6 @@ tokio.workspace = true
 # rpc
 async-trait = "0.1"
 jsonrpsee = { version = "0.23", features = ["server", "macros"] }
+
+# misc
+tracing = "0.1"
