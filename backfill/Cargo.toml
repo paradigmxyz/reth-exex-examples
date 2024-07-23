@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 # reth
+reth-evm.workspace = true
 reth-execution-types.workspace = true
 reth-exex.workspace = true
 reth-node-api.workspace = true
@@ -22,3 +23,6 @@ tokio.workspace = true
 # rpc
 async-trait = "0.1"
 jsonrpsee = { version = "0.23", features = ["server", "macros"] }
+
+# cli
+clap = "4"
