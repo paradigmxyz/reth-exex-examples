@@ -22,10 +22,9 @@ trait BackfillRpcExtApi {
     async fn cancel(&self, job_id: u64) -> RpcResult<()>;
 }
 
-/// The RPC module that exposes the backfill RPC methods and sends backfill requests to
-/// [`BackfillExEx`].
+/// The RPC module that exposes the backfill RPC methods and sends backfill messages to the ExEx.
 pub struct BackfillRpcExt {
-    /// Sender for backfill requests and receivers of responses.
+    /// Sender for backfill messages.
     pub backfill_tx: mpsc::UnboundedSender<BackfillMessage>,
 }
 
