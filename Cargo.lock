@@ -1082,6 +1082,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "backfill"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "eyre",
+ "futures",
+ "jsonrpsee",
+ "reth",
+ "reth-execution-types",
+ "reth-exex",
+ "reth-node-api",
+ "reth-node-ethereum",
+ "reth-tracing",
+ "tokio",
+]
+
+[[package]]
 name = "backon"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,0 +1,24 @@
+[package]
+name = "backfill"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# reth
+reth-execution-types.workspace = true
+reth-exex.workspace = true
+reth-node-api.workspace = true
+reth-node-ethereum.workspace = true
+reth-tracing.workspace = true
+reth.workspace = true
+
+# async
+eyre.workspace = true
+futures.workspace = true
+tokio.workspace = true
+
+# rpc
+async-trait = "0.1"
+jsonrpsee = { version = "0.23", features = ["server", "macros"] }
