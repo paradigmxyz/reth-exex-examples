@@ -1,6 +1,8 @@
+//! CLI Extension module for Kona
+
 use clap::Args;
+use reqwest::Url;
 use reth::rpc::types::engine::JwtSecret;
-use url::Url;
 
 pub const DEFAULT_L2_RPC_URL: &str = "https://optimism.llamarpc.com";
 

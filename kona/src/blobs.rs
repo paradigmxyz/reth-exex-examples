@@ -9,7 +9,7 @@ use kona_derive::{
     types::{alloy_primitives::B256, Blob, BlobProviderError, BlockInfo, IndexedBlobHash},
 };
 use parking_lot::Mutex;
-use url::Url;
+use reqwest::Url;
 
 /// Fallback online blob provider.
 pub type OnlineBlobFallback = OnlineBlobProvider<OnlineBeaconClient, SimpleSlotDerivation>;
