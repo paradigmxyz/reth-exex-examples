@@ -100,7 +100,7 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
     }
 
     /// Steps the L2 derivation pipeline and validates the prepared attributes.
-    async fn step_l2(&mut self) -> Result<()> {
+    async fn step_l2(&mut self) {
         match self.pipeline.step(self.l2_block_cursor).await {
             StepResult::PreparedAttributes => info!(target: "loop", "Prepared attributes"),
             StepResult::AdvancedOrigin => info!(target: "loop", "Advanced origin"),
@@ -125,13 +125,13 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
                     warn!(target: "loop", "Attributes failed validation");
                     // If the validation fails, take the attributes out and continue
                     let _ = self.pipeline.next();
-                    return Ok(());
+                    return;
                 }
                 Err(err) => {
                     error!(target: "loop", ?err, "Error validating attributes");
                     // If the attributes fail validation, retry them without taking them
                     // out of the pipeline
-                    return Ok(());
+                    return;
                 }
             }
         } else {
@@ -143,7 +143,7 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
             attributes
         } else {
             error!(target: "loop", "Must have valid attributes");
-            return Ok(());
+            return;
         };
 
         // If we validated some attributes, we should advance the cursor.
@@ -158,11 +158,9 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
             self.pipeline.origin().unwrap().number,
         );
         debug!(target: "loop", "attributes: {:#?}", attributes);
-
-        Ok(())
     }
 
-    fn handle_exex_notification(&mut self, notification: ExExNotification) -> Result<()> {
+    fn handle_exex_notification(&mut self, notification: ExExNotification) {
         if let Some(_reverted_chain) = notification.reverted_chain() {
             // TODO: handle reverted chain
         }
@@ -174,19 +172,16 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
                 self.is_synced_to_l2_genesis = true;
             }
             if let Err(err) = self.ctx.events.send(ExExEvent::FinishedHeight(tip_number)) {
-                error!(target: "loop", ?err, "Failed to send ExEx event");
-                bail!("Failed to send ExEx event: {:?}", err);
+                panic!("Critical: Failed to send ExEx event: {:?}", err);
             }
         }
-
-        Ok(())
     }
 
     /// Starts the Kona Execution Extension loop.
     pub async fn start(mut self) -> Result<()> {
         loop {
             if self.is_synced_to_l2_genesis {
-                self.step_l2().await?;
+                self.step_l2().await;
             }
 
             if self.should_advance_l2_block_cursor {
@@ -204,7 +199,7 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
             }
 
             if let Ok(notification) = self.ctx.notifications.try_recv() {
-                self.handle_exex_notification(notification)?;
+                self.handle_exex_notification(notification);
             }
 
             if self.ctx.notifications.is_closed() {
