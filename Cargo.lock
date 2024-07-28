@@ -4272,6 +4272,7 @@ dependencies = [
  "clap",
  "eyre",
  "kona-derive",
+ "parking_lot 0.12.3",
  "reqwest",
  "reth",
  "reth-execution-types",

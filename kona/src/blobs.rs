@@ -1,17 +1,14 @@
 //! Blob Provider
 
-use anyhow::Result;
+use std::{boxed::Box, collections::HashMap, sync::Arc};
+
 use async_trait::async_trait;
 use kona_derive::{
     online::{OnlineBeaconClient, OnlineBlobProvider, SimpleSlotDerivation},
     traits::BlobProvider,
     types::{alloy_primitives::B256, Blob, BlobProviderError, BlockInfo, IndexedBlobHash},
 };
-use std::{
-    boxed::Box,
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use parking_lot::Mutex;
 use url::Url;
 
 /// Fallback online blob provider.
@@ -62,16 +59,21 @@ impl ExExBlobProvider {
         Self(inner, fallback)
     }
 
+    /// Inserts multiple blobs into the in-memory provider.
+    pub fn insert_blobs(&mut self, block_hash: B256, blobs: Vec<Blob>) {
+        self.0.lock().insert_blobs(block_hash, blobs);
+    }
+
     /// Attempts to fetch blobs using the inner blob store.
     async fn inner_blob_load(
         &mut self,
         block_ref: &BlockInfo,
         hashes: &[IndexedBlobHash],
-    ) -> anyhow::Result<Vec<Blob>> {
-        let err = |block_ref: &BlockInfo| {
-            anyhow::anyhow!("Blob not found for block ref: {:?}", block_ref)
-        };
-        let locked = self.0.lock().map_err(|_| anyhow::anyhow!("Failed to lock inner provider"))?;
+    ) -> eyre::Result<Vec<Blob>> {
+        let err =
+            |block_ref: &BlockInfo| eyre::eyre!("Blob not found for block ref: {:?}", block_ref);
+
+        let locked = self.0.lock();
         let blobs_for_block =
             locked.blocks_to_blob.get(&block_ref.hash).ok_or_else(|| err(block_ref))?;
         let mut blobs = Vec::new();
@@ -80,6 +82,7 @@ impl ExExBlobProvider {
                 blobs.push(*blob);
             }
         }
+
         Ok(blobs)
     }
 }
