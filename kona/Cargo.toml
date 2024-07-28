@@ -1,0 +1,39 @@
+[package]
+name = "kona"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# reth
+reth.workspace = true
+reth-exex.workspace = true
+reth-node-api.workspace = true
+reth-node-ethereum.workspace = true
+reth-tracing.workspace = true
+reth-execution-types.workspace = true
+
+# alloy
+alloy = { version = "0.1.4", features = ["full"] }
+alloy-rlp = "0.3.4"
+
+# other
+clap = "4" 
+tracing = "0.1.40"
+async-trait = "0.1.81"
+url = "2.5.2"
+reqwest = "0.12.5"
+serde_json = "1.0.120"
+eyre.workspace = true
+tokio.workspace = true
+
+# kona
+anyhow = { version = "1.0.86", default-features = false }
+kona-derive = { git = "https://github.com/ethereum-optimism/kona", branch = "main", features = ["online", "serde"] }
+
+[dev-dependencies]
+reth-exex-test-utils.workspace = true
+reth-testing-utils.workspace = true
+
+tokio.workspace = true
