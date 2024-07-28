@@ -175,6 +175,28 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
         debug!(target: "loop", "attributes: {:#?}", attributes);
     }
 
+    async fn advance_l2_cursor(&mut self) -> Result<()> {
+        let next_l2_block = self.l2_block_cursor.block_info.number + 1;
+        match self.l2_provider.l2_block_info_by_number(next_l2_block).await {
+            Ok(bi) => {
+                let tip = self
+                    .chain_provider
+                    .block_info_by_number(bi.l1_origin.number)
+                    .await
+                    .map_err(|e| eyre::eyre!(e))?;
+
+                self.l1_to_l2_block_cursor.insert(tip, bi);
+                self.l2_block_cursor = bi;
+                self.should_advance_l2_block_cursor = false;
+            }
+            Err(err) => {
+                error!(target: "loop", ?err, "Failed to fetch next pending l2 safe head: {}", next_l2_block);
+            }
+        }
+
+        Ok(())
+    }
+
     async fn handle_exex_notification(&mut self, notification: ExExNotification) -> Result<()> {
         if let Some(reverted_chain) = notification.reverted_chain() {
             self.chain_provider.commit(reverted_chain.clone());
@@ -227,24 +249,7 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
             }
 
             if self.should_advance_l2_block_cursor {
-                let next_l2_block = self.l2_block_cursor.block_info.number + 1;
-                match self.l2_provider.l2_block_info_by_number(next_l2_block).await {
-                    Ok(bi) => {
-                        let tip = self
-                            .chain_provider
-                            .block_info_by_number(bi.l1_origin.number)
-                            .await
-                            .map_err(|e| eyre::eyre!(e))?;
-
-                        self.l1_to_l2_block_cursor.insert(tip, bi);
-                        self.l2_block_cursor = bi;
-                        self.should_advance_l2_block_cursor = false;
-                    }
-                    Err(err) => {
-                        error!(target: "loop", ?err, "Failed to fetch next pending l2 safe head: {}", next_l2_block);
-                        continue;
-                    }
-                }
+                self.advance_l2_cursor().await?;
             }
 
             if let Ok(notification) = self.ctx.notifications.try_recv() {
