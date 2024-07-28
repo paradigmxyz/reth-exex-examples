@@ -7,8 +7,11 @@ use alloy::{
 };
 use async_trait::async_trait;
 use kona_derive::types::{L2AttributesWithParent, L2PayloadAttributes, RawTransaction};
-use std::{fmt::Debug, vec::Vec};
+use reqwest::{Client, StatusCode};
+use reth::rpc::types::engine::{Claims, JwtSecret};
+use std::fmt::Debug;
 use tracing::{error, warn};
+use url::Url;
 
 /// AttributesValidator
 ///
@@ -38,8 +41,8 @@ impl TrustedValidator {
         Self { provider, canyon_activation: canyon }
     }
 
-    /// Creates a new [`TrustedValidator`] from the provided [reqwest::Url].
-    pub fn new_http(url: reqwest::Url, canyon: u64) -> Self {
+    /// Creates a new [`TrustedValidator`] from the provided [Url].
+    pub fn new_http(url: Url, canyon: u64) -> Self {
         let inner = ReqwestProvider::new_http(url);
         Self::new(inner, canyon)
     }
@@ -95,7 +98,6 @@ impl TrustedValidator {
 
 #[async_trait]
 impl AttributesValidator for TrustedValidator {
-    /// Validates the given [`L2AttributesWithParent`].
     async fn validate(&self, attributes: &L2AttributesWithParent) -> eyre::Result<bool> {
         let expected = attributes.parent.block_info.number + 1;
         let tag = BlockNumberOrTag::from(expected);
@@ -104,6 +106,64 @@ impl AttributesValidator for TrustedValidator {
             Err(err) => {
                 error!(target: "validation", ?err, "Failed to fetch payload for block {}", expected);
                 eyre::bail!("Failed to fetch payload for block {}: {:?}", expected, err);
+            }
+        }
+    }
+}
+
+/// EngineApiValidator
+///
+/// Validates the [`L2AttributesWithParent`] by sending the attributes to an L2 engine API.
+/// The engine API will return a VALID or INVALID response.
+#[derive(Debug, Clone)]
+pub struct EngineApiValidator {
+    /// The engine API URL.
+    url: Url,
+    /// The reqwest client.
+    client: Client,
+    /// The JWT secret token for the engine API.
+    jwt_secret: JwtSecret,
+}
+
+impl EngineApiValidator {
+    /// Creates a new [`EngineApiValidator`] from the provided [Url] and [JwtSecret].
+    pub fn new_http(url: Url, jwt: JwtSecret) -> Self {
+        Self { url, client: Client::new(), jwt_secret: jwt }
+    }
+}
+
+#[async_trait]
+impl AttributesValidator for EngineApiValidator {
+    async fn validate(&self, attributes: &L2AttributesWithParent) -> eyre::Result<bool> {
+        let request_body = serde_json::json!({
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": "engine_newPayloadV2",
+            "params": [attributes.attributes]
+        });
+
+        let claims = Claims::default();
+        let jwt = self.jwt_secret.encode(&claims)?;
+
+        let response = self
+            .client
+            .post(self.url.clone())
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .header(reqwest::header::AUTHORIZATION, format!("Bearer {}", jwt))
+            .json(&request_body)
+            .send()
+            .await?;
+
+        let status = response.status();
+        let body = response.json::<serde_json::Value>().await?;
+        match status {
+            StatusCode::OK => Ok(body
+                .pointer("/result/status")
+                .and_then(|status| status.as_str())
+                .map_or(false, |status| status == "VALID")),
+            _ => {
+                error!(target: "validation", ?body, "Engine API returned status: {}", status);
+                eyre::bail!("Engine API returned status: {} and body: {:#?}", status, body);
             }
         }
     }

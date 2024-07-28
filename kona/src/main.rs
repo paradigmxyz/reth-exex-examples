@@ -7,16 +7,17 @@ use kona_derive::{
     traits::{ChainProvider, L2ChainProvider, OriginProvider, Pipeline, StepResult},
     types::{BlockInfo, L2BlockInfo, RollupConfig, StageError, OP_MAINNET_CONFIG},
 };
-use reth::transaction_pool::TransactionPool;
+use reth::{cli::Cli, transaction_pool::TransactionPool};
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
+use reth_node_ethereum::EthereumNode;
 use tracing::{debug, error, info, warn};
 
 mod blobs;
 use blobs::ExExBlobProvider;
 
 mod cli_ext;
-use cli_ext::KonaArgsExt;
+use cli_ext::{KonaArgsExt, ValidationMode};
 
 mod pipeline;
 use pipeline::{new_local_pipeline, LocalAttributesBuilder, LocalPipeline};
@@ -25,7 +26,7 @@ mod providers;
 use providers::LocalChainProvider;
 
 mod validation;
-use validation::{AttributesValidator, TrustedValidator};
+use validation::{AttributesValidator, EngineApiValidator, TrustedValidator};
 
 #[derive(Debug)]
 pub(crate) struct KonaExEx<Node: FullNodeComponents> {
@@ -71,11 +72,18 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
         let attributes =
             LocalAttributesBuilder::new(cfg.clone(), l2_provider.clone(), chain_provider.clone());
 
-        // TODO: add engine api validator
-        let validator = Box::new(TrustedValidator::new_http(
-            args.l2_rpc_url,
-            cfg.canyon_time.unwrap_or_default(),
-        ));
+        let validator: Box<dyn AttributesValidator + Send> = match args.validation_mode {
+            ValidationMode::Trusted => Box::new(TrustedValidator::new_http(
+                args.l2_rpc_url,
+                cfg.canyon_time.unwrap_or_default(),
+            )),
+            ValidationMode::EngineApi => Box::new(EngineApiValidator::new_http(
+                // The presence of these variables is enforced by the clap configuration,
+                // so we can safely unwrap them here.
+                args.l2_engine_api_url.unwrap(),
+                args.l2_engine_jwt.unwrap(),
+            )),
+        };
 
         // TODO: use static genesis block info without fetching it
         let cursor = l2_provider.l2_block_info_by_number(cfg.genesis.l2.number).await.unwrap();
@@ -156,11 +164,11 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
         // If we validated some attributes, we should advance the cursor.
         self.derived_payloads_count += 1;
         self.should_advance_l2_block_cursor = true;
-        let derived_block = attributes.parent.block_info.number as i64 + 1;
+
         println!(
             "Validated Payload Attributes {} [L2 Block Num: {}] [L2 Timestamp: {}] [L1 Origin Block Num: {}]",
             self.derived_payloads_count,
-            derived_block,
+            attributes.parent.block_info.number as i64 + 1,
             attributes.attributes.timestamp,
             self.pipeline.origin().unwrap().number,
         );
@@ -197,10 +205,12 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
         if let Some(committed_chain) = notification.committed_chain() {
             let tip_number = committed_chain.tip().number; // TODO: ensure this is the right tip
             self.chain_provider.commit(committed_chain);
+
             if tip_number >= self.cfg.genesis.l1.number {
                 tracing::debug!(target: "loop", "Chain synced to rollup genesis with L1 block number: {}", tip_number);
                 self.is_synced_to_l2_genesis = true;
             }
+
             if let Err(err) = self.ctx.events.send(ExExEvent::FinishedHeight(tip_number)) {
                 bail!("Critical: Failed to send ExEx event: {:?}", err);
             }
@@ -250,12 +260,10 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
 }
 
 fn main() -> Result<()> {
-    reth::cli::Cli::<cli_ext::KonaArgsExt>::parse().run(|builder, args| async move {
-        let handle = builder
-            .node(reth_node_ethereum::EthereumNode::default())
-            .install_exex("Kona", move |ctx| async { Ok(KonaExEx::new(ctx, args).await.start()) })
-            .launch()
-            .await?;
+    Cli::<KonaArgsExt>::parse().run(|builder, args| async move {
+        let node = EthereumNode::default();
+        let kona = move |ctx| async { Ok(KonaExEx::new(ctx, args).await.start()) };
+        let handle = builder.node(node).install_exex("Kona", kona).launch().await?;
         handle.wait_for_node_exit().await
     })
 }
