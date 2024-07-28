@@ -5,7 +5,6 @@ use alloy::{
     rpc::types::{BlockNumberOrTag, BlockTransactionsKind, Header},
     transports::TransportResult,
 };
-use anyhow::Result;
 use async_trait::async_trait;
 use kona_derive::types::{L2AttributesWithParent, L2PayloadAttributes, RawTransaction};
 use std::{fmt::Debug, vec::Vec};
@@ -52,14 +51,14 @@ impl TrustedValidator {
     pub(crate) async fn get_block(
         &self,
         tag: BlockNumberOrTag,
-    ) -> Result<(Header, Vec<RawTransaction>)> {
+    ) -> eyre::Result<(Header, Vec<RawTransaction>)> {
         // Don't hydrate the block so we only get a list of transaction hashes.
         let block = self
             .provider
             .get_block(tag.into(), BlockTransactionsKind::Hashes)
             .await
-            .map_err(|e| anyhow::anyhow!(e))?
-            .ok_or(anyhow::anyhow!("Block not found"))?;
+            .map_err(|e| eyre::eyre!(e))?
+            .ok_or(eyre::eyre!("Block not found"))?;
         // For each transaction hash, fetch the raw transaction RLP.
         let mut txs = vec![];
         for tx in block.transactions.hashes() {
@@ -75,7 +74,10 @@ impl TrustedValidator {
     }
 
     /// Gets the payload for the specified [BlockNumberOrTag].
-    pub(crate) async fn get_payload(&self, tag: BlockNumberOrTag) -> Result<L2PayloadAttributes> {
+    pub(crate) async fn get_payload(
+        &self,
+        tag: BlockNumberOrTag,
+    ) -> eyre::Result<L2PayloadAttributes> {
         let (header, transactions) = self.get_block(tag).await?;
         Ok(L2PayloadAttributes {
             timestamp: header.timestamp,

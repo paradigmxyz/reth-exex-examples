@@ -1,12 +1,13 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use clap::Parser;
 use eyre::{bail, Result};
 use kona_derive::{
     online::{AlloyL2ChainProvider, EthereumDataSource},
     traits::{ChainProvider, L2ChainProvider, OriginProvider, Pipeline, StepResult},
-    types::{L2BlockInfo, RollupConfig, StageError, OP_MAINNET_CONFIG},
+    types::{BlockInfo, L2BlockInfo, RollupConfig, StageError, OP_MAINNET_CONFIG},
 };
+use reth::transaction_pool::TransactionPool;
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
 use tracing::{debug, error, info, warn};
@@ -37,12 +38,16 @@ pub(crate) struct KonaExEx<Node: FullNodeComponents> {
     /// The L2 chain provider to fetch L2 block information and optionally
     /// verify newly derived payloads against
     l2_provider: AlloyL2ChainProvider,
+    /// The blob provider to fetch blobs from the beacon client
+    blob_provider: ExExBlobProvider,
     /// The validator to verify newly derived payloads
     validator: Box<dyn AttributesValidator + Send>,
     /// The derivation pipeline
     pipeline: LocalPipeline,
     /// The current L2 block we are processing
     l2_block_cursor: L2BlockInfo,
+    /// A map of L1 anchor blocks to their L2 cursor
+    l1_to_l2_block_cursor: HashMap<BlockInfo, L2BlockInfo>,
     /// Whether the ExEx is synced to the L2 genesis
     is_synced_to_l2_genesis: bool,
     /// Whether we should advance the L2 block cursor
@@ -61,7 +66,7 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
 
         let mut l2_provider = AlloyL2ChainProvider::new_http(args.l2_rpc_url.clone(), cfg.clone());
         let blob_provider = ExExBlobProvider::new_from_beacon_client(args.beacon_client_url);
-        let dap = EthereumDataSource::new(chain_provider.clone(), blob_provider, &cfg);
+        let dap = EthereumDataSource::new(chain_provider.clone(), blob_provider.clone(), &cfg);
 
         let attributes =
             LocalAttributesBuilder::new(cfg.clone(), l2_provider.clone(), chain_provider.clone());
@@ -92,7 +97,9 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
             pipeline,
             chain_provider,
             l2_provider,
+            blob_provider,
             l2_block_cursor: cursor,
+            l1_to_l2_block_cursor: HashMap::new(),
             is_synced_to_l2_genesis: false,
             should_advance_l2_block_cursor: false,
             derived_payloads_count: 0,
@@ -160,10 +167,33 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
         debug!(target: "loop", "attributes: {:#?}", attributes);
     }
 
-    fn handle_exex_notification(&mut self, notification: ExExNotification) {
-        if let Some(_reverted_chain) = notification.reverted_chain() {
-            // TODO: handle reverted chain
+    async fn handle_exex_notification(&mut self, notification: ExExNotification) -> Result<()> {
+        if let Some(reverted_chain) = notification.reverted_chain() {
+            self.chain_provider.commit(reverted_chain.clone());
+            let l1_block_info = info_from_header(&reverted_chain.tip().block);
+
+            // Insert blobs in the blob provider for the reverted chain
+            for block in reverted_chain.blocks_iter() {
+                let tx_hashes = block.transactions().map(|tx| tx.hash).collect::<Vec<_>>();
+                let blobs = self.ctx.pool().get_all_blobs(tx_hashes)?;
+                let blobs = blobs.into_iter().flat_map(|b| b.1.blobs).collect::<Vec<_>>();
+                self.blob_provider.insert_blobs(block.hash(), blobs);
+            }
+
+            // Find the l2 block cursor associated with the reverted L1 chain tip
+            let l2_cursor = if let Some(c) = self.l1_to_l2_block_cursor.get(&l1_block_info) {
+                *c
+            } else {
+                bail!("Critical: Failed to get previous cursor for old chain tip");
+            };
+
+            // Reset the pipeline to the previous L2 block cursor
+            self.l2_block_cursor = l2_cursor;
+            if let Err(err) = self.pipeline.reset(l2_cursor.block_info, l1_block_info).await {
+                bail!("Critical: Failed to reset pipeline: {:?}", err);
+            }
         }
+
         if let Some(committed_chain) = notification.committed_chain() {
             let tip_number = committed_chain.tip().number; // TODO: ensure this is the right tip
             self.chain_provider.commit(committed_chain);
@@ -172,9 +202,11 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
                 self.is_synced_to_l2_genesis = true;
             }
             if let Err(err) = self.ctx.events.send(ExExEvent::FinishedHeight(tip_number)) {
-                panic!("Critical: Failed to send ExEx event: {:?}", err);
+                bail!("Critical: Failed to send ExEx event: {:?}", err);
             }
         }
+
+        Ok(())
     }
 
     /// Starts the Kona Execution Extension loop.
@@ -188,6 +220,13 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
                 let next_l2_block = self.l2_block_cursor.block_info.number + 1;
                 match self.l2_provider.l2_block_info_by_number(next_l2_block).await {
                     Ok(bi) => {
+                        let tip = self
+                            .chain_provider
+                            .block_info_by_number(bi.l1_origin.number)
+                            .await
+                            .map_err(|e| eyre::eyre!(e))?;
+
+                        self.l1_to_l2_block_cursor.insert(tip, bi);
                         self.l2_block_cursor = bi;
                         self.should_advance_l2_block_cursor = false;
                     }
@@ -199,7 +238,7 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
             }
 
             if let Ok(notification) = self.ctx.notifications.try_recv() {
-                self.handle_exex_notification(notification);
+                self.handle_exex_notification(notification).await?;
             }
 
             if self.ctx.notifications.is_closed() {
@@ -219,4 +258,13 @@ fn main() -> Result<()> {
             .await?;
         handle.wait_for_node_exit().await
     })
+}
+
+fn info_from_header(block: &reth::primitives::SealedBlock) -> BlockInfo {
+    BlockInfo {
+        hash: block.hash(),
+        number: block.number,
+        timestamp: block.timestamp,
+        parent_hash: block.parent_hash,
+    }
 }
