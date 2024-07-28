@@ -1,5 +1,7 @@
 //! Contains logic to validate derivation pipeline outputs.
 
+use std::fmt::Debug;
+
 use alloy::{
     providers::{Provider, ReqwestProvider},
     rpc::types::{BlockNumberOrTag, BlockTransactionsKind, Header},
@@ -7,11 +9,9 @@ use alloy::{
 };
 use async_trait::async_trait;
 use kona_derive::types::{L2AttributesWithParent, L2PayloadAttributes, RawTransaction};
-use reqwest::{Client, StatusCode};
+use reqwest::{Client, StatusCode, Url};
 use reth::rpc::types::engine::{Claims, JwtSecret};
-use std::fmt::Debug;
 use tracing::{error, warn};
-use url::Url;
 
 /// AttributesValidator
 ///
