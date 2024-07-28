@@ -1,4 +1,5 @@
 use clap::Args;
+use reth::rpc::types::engine::JwtSecret;
 use url::Url;
 
 pub const DEFAULT_L2_RPC_URL: &str = "https://optimism.llamarpc.com";
@@ -19,13 +20,18 @@ pub(crate) struct KonaArgsExt {
     #[clap(
         long = "kona.validation-mode",
         default_value = "trusted",
-        requires_if("engine-api", "kona.l2-engine-api-url")
+        requires_if("engine-api", "kona.l2-engine-api-url"),
+        requires_if("engine-api", "kona.l2-engine-jwt")
     )]
     pub validation_mode: ValidationMode,
 
     /// If the mode is "engine api", we also need an URL for it.
     #[clap(long = "kona.l2-engine-api-url")]
     pub l2_engine_api_url: Option<Url>,
+
+    /// If the mode is "engine api", we also need a JWT for it.
+    #[clap(long = "kona.l2-engine-jwt")]
+    pub l2_engine_jwt: Option<JwtSecret>,
 }
 
 #[derive(Debug, Clone)]
