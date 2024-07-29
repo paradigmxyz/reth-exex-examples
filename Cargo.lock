@@ -1098,6 +1098,7 @@ dependencies = [
  "reth-node-ethereum",
  "reth-tracing",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

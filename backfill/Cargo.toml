@@ -26,3 +26,6 @@ jsonrpsee = { version = "0.23", features = ["server", "macros"] }
 
 # cli
 clap = "4"
+
+# misc
+tracing = "0.1"

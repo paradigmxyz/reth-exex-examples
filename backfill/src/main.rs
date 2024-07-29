@@ -1,14 +1,11 @@
-use std::{ops::RangeInclusive, sync::Arc};
+mod rpc;
 
-use async_trait::async_trait;
+use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
+
 use clap::{Args, Parser};
 use eyre::OptionExt;
 use futures::TryStreamExt;
-use jsonrpsee::{
-    core::RpcResult,
-    proc_macros::rpc,
-    types::{error::INTERNAL_ERROR_CODE, ErrorObject},
-};
+use jsonrpsee::tracing::instrument;
 use reth::{
     primitives::{BlockId, BlockNumber, BlockNumberOrTag, Requests},
     providers::{BlockIdReader, BlockReader, HeaderProvider, StateProviderFactory},
@@ -19,37 +16,61 @@ use reth_exex::{BackfillJob, BackfillJobFactory, ExExContext, ExExEvent, ExExNot
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
 use reth_tracing::tracing::{error, info};
-use tokio::sync::{mpsc, oneshot, Semaphore};
+use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
 
-type BackfillRequest = (RangeInclusive<BlockNumber>, oneshot::Sender<eyre::Result<()>>);
+use crate::rpc::{BackfillRpcExt, BackfillRpcExtApiServer};
+
+/// The message type used to communicate with the ExEx.
+enum BackfillMessage {
+    /// Start a backfill job for the given range.
+    ///
+    /// The job ID will be sent on the provided channel.
+    Start { range: RangeInclusive<BlockNumber>, response_tx: oneshot::Sender<eyre::Result<u64>> },
+    /// Cancel the backfill job with the given ID.
+    ///
+    /// The cancellation result will be sent on the provided channel.
+    Cancel { job_id: u64, response_tx: oneshot::Sender<eyre::Result<()>> },
+    /// Finish the backfill job with the given ID, if it exists.
+    Finish { job_id: u64 },
+}
 
 /// The ExEx that consumes new [`ExExNotification`]s and processes new backfill requests by
 /// [`BackfillRpcExt`].
 struct BackfillExEx<Node: FullNodeComponents> {
     /// The context of the ExEx.
     ctx: ExExContext<Node>,
-    /// Receiver for backfill requests and senders of responses.
-    backfill_rx: mpsc::UnboundedReceiver<BackfillRequest>,
+    /// Sender for backfill messages.
+    backfill_tx: mpsc::UnboundedSender<BackfillMessage>,
+    /// Receiver for backfill messages.
+    backfill_rx: mpsc::UnboundedReceiver<BackfillMessage>,
     /// Factory for backfill jobs.
     backfill_job_factory: BackfillJobFactory<Node::Executor, Node::Provider>,
     /// Semaphore to limit the number of concurrent backfills.
     backfill_semaphore: Arc<Semaphore>,
+    /// Next backfill job ID.
+    next_backfill_job_id: u64,
+    /// Mapping of backfill job IDs to backfill jobs.
+    backfill_jobs: HashMap<u64, oneshot::Sender<oneshot::Sender<()>>>,
 }
 
 impl<Node: FullNodeComponents> BackfillExEx<Node> {
     /// Creates a new instance of the ExEx.
     fn new(
         ctx: ExExContext<Node>,
-        backfill_rx: mpsc::UnboundedReceiver<BackfillRequest>,
+        backfill_tx: mpsc::UnboundedSender<BackfillMessage>,
+        backfill_rx: mpsc::UnboundedReceiver<BackfillMessage>,
         backfill_limit: usize,
     ) -> Self {
         let backfill_job_factory =
             BackfillJobFactory::new(ctx.block_executor().clone(), ctx.provider().clone());
         Self {
             ctx,
+            backfill_tx,
             backfill_rx,
             backfill_job_factory,
             backfill_semaphore: Arc::new(Semaphore::new(backfill_limit)),
+            next_backfill_job_id: 0,
+            backfill_jobs: HashMap::new(),
         }
     }
 
@@ -58,20 +79,18 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         loop {
             tokio::select! {
                 Some(notification) = self.ctx.notifications.recv() => {
-                    self.process_notification(notification).await?;
+                    self.handle_notification(notification).await?;
                 }
-                Some((range, backfill_tx)) = self.backfill_rx.recv() => {
-                    let _ = backfill_tx
-                        .send(self.backfill(range))
-                        .inspect_err(|_| error!("Failed to send backfill response to RPC"));
+                Some(message) = self.backfill_rx.recv() => {
+                    self.handle_backfill_message(message).await;
                 }
             }
         }
     }
 
-    /// Processes the given notification and calls [`Self::process_committed_chain`] for every
-    /// committed chain.
-    async fn process_notification(&self, notification: ExExNotification) -> eyre::Result<()> {
+    /// Handles the given notification and calls [`Self::process_committed_chain`] for a committed
+    /// chain, if any.
+    async fn handle_notification(&self, notification: ExExNotification) -> eyre::Result<()> {
         match &notification {
             ExExNotification::ChainCommitted { new } => {
                 info!(committed_chain = ?new.range(), "Received commit");
@@ -93,31 +112,101 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         Ok(())
     }
 
-    /// Backfills the given range of blocks in parallel using [`backfill_with_job`].
-    /// Acquires a permit semaphore that limits the number of concurrent backfills.
-    /// The backfill job is spawned in a separate task.
+    /// Handles the given backfill message.
+    async fn handle_backfill_message(&mut self, message: BackfillMessage) {
+        match message {
+            BackfillMessage::Start { range, response_tx } => {
+                let _ = response_tx
+                    .send(self.start_backfill(range))
+                    .inspect_err(|_| error!("Failed to send backfill start response"));
+            }
+            BackfillMessage::Cancel { job_id, response_tx } => {
+                let _ = response_tx
+                    .send(self.cancel_backfill(job_id).await)
+                    .inspect_err(|_| error!("Failed to send backfill cancel response"));
+
+                self.backfill_jobs.remove(&job_id);
+            }
+            BackfillMessage::Finish { job_id } => {
+                self.backfill_jobs.remove(&job_id);
+            }
+        }
+    }
+
+    /// Backfills the given range of blocks in parallel. Requires acquiring a
+    /// semaphore permit that limits the number of concurrent backfills. The backfill job is
+    /// spawned in a separate task.
     ///
-    /// Returns an error if the semaphore permit could not be acquired.
-    fn backfill(&self, range: RangeInclusive<BlockNumber>) -> eyre::Result<()> {
+    /// Returns the backfill job ID or an error if the semaphore permit could not be acquired.
+    fn start_backfill(&mut self, range: RangeInclusive<BlockNumber>) -> eyre::Result<u64> {
         let permit = self
             .backfill_semaphore
             .clone()
             .try_acquire_owned()
             .map_err(|err| eyre::eyre!("concurrent backfills limit reached: {err:?}"))?;
 
+        let job_id = self.next_backfill_job_id;
+        self.next_backfill_job_id += 1;
+
+        let (cancel_tx, cancel_rx) = oneshot::channel();
+        self.backfill_jobs.insert(job_id, cancel_tx);
+
         let job = self
             .backfill_job_factory
             // Create a backfill job for the given range
             .backfill(range);
-        self.ctx.task_executor().spawn(async {
-            let result = backfill_with_job(job).await;
-            drop(permit);
-            if let Err(err) = result {
-                error!(%err, "Backfill error occurred");
-            }
+        let backfill_tx = self.backfill_tx.clone();
+
+        // Spawn the backfill job in a separate task
+        self.ctx.task_executor().spawn(async move {
+            Self::backfill(permit, job_id, job, backfill_tx, cancel_rx).await
         });
 
+        Ok(job_id)
+    }
+
+    /// Cancels the backfill job with the given ID.
+    async fn cancel_backfill(&mut self, job_id: u64) -> eyre::Result<()> {
+        let Some(cancel_tx) = self.backfill_jobs.remove(&job_id) else {
+            eyre::bail!("backfill job not found");
+        };
+
+        let (tx, rx) = oneshot::channel();
+        cancel_tx.send(tx).map_err(|_| eyre::eyre!("failed to cancel backfill job"))?;
+        let _ = rx.await;
+
         Ok(())
+    }
+
+    /// Calls the [`Self::process_committed_chain`] method for each backfilled block.
+    ///
+    /// Listens on the `cancel_rx` channel for cancellation requests.
+    #[instrument(level = "info", skip(_permit, job, backfill_tx, cancel_rx))]
+    async fn backfill(
+        _permit: OwnedSemaphorePermit,
+        job_id: u64,
+        job: BackfillJob<Node::Executor, Node::Provider>,
+        backfill_tx: mpsc::UnboundedSender<BackfillMessage>,
+        cancel_rx: oneshot::Receiver<oneshot::Sender<()>>,
+    ) {
+        let backfill = backfill_with_job(job);
+
+        tokio::select! {
+            result = backfill => {
+                if let Err(err) = result {
+                    error!(%err, "Backfill error occurred");
+                }
+
+                let _ = backfill_tx.send(BackfillMessage::Finish { job_id });
+            }
+            sender = cancel_rx => {
+                info!("Backfill job cancelled");
+
+                if let Ok(sender) = sender {
+                    let _ = sender.send(());
+                }
+            }
+        }
     }
 }
 
@@ -161,46 +250,6 @@ async fn process_committed_chain(chain: &Chain) -> eyre::Result<()> {
     Ok(())
 }
 
-#[rpc(server, namespace = "backfill")]
-trait BackfillRpcExtApi {
-    /// Starts backfilling the given range of blocks asynchronously.
-    #[method(name = "start")]
-    async fn start(&self, from_block: BlockNumber, to_block: BlockNumber) -> RpcResult<()>;
-}
-
-/// The RPC module that exposes the backfill RPC methods and sends backfill requests to
-/// [`BackfillExEx`].
-struct BackfillRpcExt {
-    /// Sender for backfill requests and receivers of responses.
-    backfill_tx: mpsc::UnboundedSender<BackfillRequest>,
-}
-
-#[async_trait]
-impl BackfillRpcExtApiServer for BackfillRpcExt {
-    async fn start(&self, from_block: BlockNumber, to_block: BlockNumber) -> RpcResult<()> {
-        let (tx, rx) = oneshot::channel();
-
-        // Send the backfill request to the ExEx
-        self.backfill_tx.send((from_block..=to_block, tx)).map_err(|err| {
-            ErrorObject::owned(
-                INTERNAL_ERROR_CODE,
-                format!("failed to send backfill request: {err:?}"),
-                None::<()>,
-            )
-        })?;
-        // Wait for the backfill response in case any errors occurred
-        rx.await
-            .map_err(|err| {
-                ErrorObject::owned(
-                    INTERNAL_ERROR_CODE,
-                    format!("failed to receive backfill response: {err:?}"),
-                    None::<()>,
-                )
-            })?
-            .map_err(|err| ErrorObject::owned(INTERNAL_ERROR_CODE, err.to_string(), None::<()>))
-    }
-}
-
 #[derive(Debug, Clone, Args)]
 struct BackfillArgsExt {
     /// Start backfill from the specified block number
@@ -217,17 +266,20 @@ fn main() -> eyre::Result<()> {
         // Create a channel for backfill requests. Sender will go to the RPC server, receiver will
         // be used by the ExEx.
         let (backfill_tx, backfill_rx) = mpsc::unbounded_channel();
+        let rpc_backfill_tx = backfill_tx.clone();
+        let exex_backfill_tx = backfill_tx.clone();
 
         let handle = builder
             .node(EthereumNode::default())
             // Extend the RPC server with the backfill RPC module.
             .extend_rpc_modules(move |ctx| {
-                ctx.modules.merge_configured(BackfillRpcExt { backfill_tx }.into_rpc())?;
+                ctx.modules
+                    .merge_configured(BackfillRpcExt { backfill_tx: rpc_backfill_tx }.into_rpc())?;
                 Ok(())
             })
             // Install the backfill ExEx.
             .install_exex("Backfill", move |ctx| async move {
-                let exex = BackfillExEx::new(ctx, backfill_rx, 10);
+                let exex = BackfillExEx::new(ctx, exex_backfill_tx, backfill_rx, 10);
 
                 let to_block = args
                     .to_block
