@@ -7,6 +7,8 @@ members = [
   "op-bridge",
   "remote",
   "rollup",
+  "wasm",
+  "wasm/wasm_exex"
 ]
 resolver = "2"
 
@@ -25,6 +27,7 @@ reth-discv5 = { git = "https://github.com/paradigmxyz/reth" }
 reth-execution-errors = { git = "https://github.com/paradigmxyz/reth" }
 reth-execution-types = { git = "https://github.com/paradigmxyz/reth" }
 reth-exex = { git = "https://github.com/paradigmxyz/reth", features = ["serde"] }
+reth-exex-types = { git = "https://github.com/paradigmxyz/reth" }
 reth-network-peers = { git = "https://github.com/paradigmxyz/reth" }
 reth-node-api = { git = "https://github.com/paradigmxyz/reth" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth" }

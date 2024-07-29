@@ -1,0 +1,33 @@
+[package]
+name = "wasm"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# reth
+reth-execution-types.workspace = true
+reth-exex.workspace = true
+reth-node-api.workspace = true
+reth-node-ethereum.workspace = true
+reth-tracing.workspace = true
+reth.workspace = true
+
+# async
+async-trait = "0.1"
+futures.workspace = true
+tokio.workspace = true
+
+# wasm
+wasi-common = "22"
+wasmtime = "22" 
+
+# misc
+eyre.workspace = true
+jsonrpsee = { version = "0.23", features = ["server", "macros"] }
+serde_json = "1"
+
+[dev-dependencies]
+reth-exex-test-utils.workspace = true
+
