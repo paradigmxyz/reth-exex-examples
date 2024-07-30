@@ -88,7 +88,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         }
     }
 
-    /// Handles the given notification and calls [`Self::process_committed_chain`] for a committed
+    /// Handles the given notification and calls [`process_committed_chain`] for a committed
     /// chain, if any.
     async fn handle_notification(&self, notification: ExExNotification) -> eyre::Result<()> {
         match &notification {
@@ -178,7 +178,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         Ok(())
     }
 
-    /// Calls the [`Self::process_committed_chain`] method for each backfilled block.
+    /// Calls the [`process_committed_chain`] method for each backfilled block.
     ///
     /// Listens on the `cancel_rx` channel for cancellation requests.
     #[instrument(level = "info", skip(_permit, job, backfill_tx, cancel_rx))]
