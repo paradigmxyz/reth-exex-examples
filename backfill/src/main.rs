@@ -104,7 +104,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         };
 
         if let Some(committed_chain) = notification.committed_chain() {
-            process_committed_chain(&committed_chain).await?;
+            process_committed_chain(&committed_chain)?;
 
             self.ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
         }
@@ -235,13 +235,13 @@ async fn backfill_with_job<
             let chain = Chain::new([sealed_block], execution_outcome, None);
 
             // Process the committed blocks
-            process_committed_chain(&chain).await
+            process_committed_chain(&chain)
         })
         .await
 }
 
 /// Processes the committed chain and logs the number of blocks and transactions.
-async fn process_committed_chain(chain: &Chain) -> eyre::Result<()> {
+fn process_committed_chain(chain: &Chain) -> eyre::Result<()> {
     // Calculate the number of blocks and transactions in the committed chain
     let blocks = chain.blocks().len();
     let transactions = chain.blocks().values().map(|block| block.body.len()).sum::<usize>();
