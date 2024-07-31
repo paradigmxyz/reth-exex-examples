@@ -1086,10 +1086,12 @@ name = "backfill"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "clap",
  "eyre",
  "futures",
  "jsonrpsee",
  "reth",
+ "reth-evm",
  "reth-execution-types",
  "reth-exex",
  "reth-node-api",

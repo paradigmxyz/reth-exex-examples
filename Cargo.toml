@@ -22,6 +22,7 @@ publish = false
 reth = { git = "https://github.com/paradigmxyz/reth" }
 reth-chainspec = { git = "https://github.com/paradigmxyz/reth" }
 reth-discv5 = { git = "https://github.com/paradigmxyz/reth" }
+reth-evm = { git = "https://github.com/paradigmxyz/reth" }
 reth-execution-errors = { git = "https://github.com/paradigmxyz/reth" }
 reth-execution-types = { git = "https://github.com/paradigmxyz/reth" }
 reth-exex = { git = "https://github.com/paradigmxyz/reth", features = ["serde"] }

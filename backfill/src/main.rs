@@ -2,9 +2,15 @@ mod rpc;
 
 use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
 
-use futures::TryStreamExt;
+use clap::{Args, Parser};
+use eyre::OptionExt;
+use futures::{FutureExt, TryStreamExt};
 use jsonrpsee::tracing::instrument;
-use reth::primitives::{BlockNumber, Requests};
+use reth::{
+    primitives::{BlockId, BlockNumber, BlockNumberOrTag, Requests},
+    providers::{BlockIdReader, BlockReader, HeaderProvider, StateProviderFactory},
+};
+use reth_evm::execute::BlockExecutorProvider;
 use reth_execution_types::{Chain, ExecutionOutcome};
 use reth_exex::{BackfillJob, BackfillJobFactory, ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
@@ -82,7 +88,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         }
     }
 
-    /// Handles the given notification and calls [`Self::process_committed_chain`] for a committed
+    /// Handles the given notification and calls [`process_committed_chain`] for a committed
     /// chain, if any.
     async fn handle_notification(&self, notification: ExExNotification) -> eyre::Result<()> {
         match &notification {
@@ -98,7 +104,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         };
 
         if let Some(committed_chain) = notification.committed_chain() {
-            Self::process_committed_chain(&committed_chain).await?;
+            process_committed_chain(&committed_chain)?;
 
             self.ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
         }
@@ -149,7 +155,6 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
             .backfill_job_factory
             // Create a backfill job for the given range
             .backfill(range);
-
         let backfill_tx = self.backfill_tx.clone();
 
         // Spawn the backfill job in a separate task
@@ -173,7 +178,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         Ok(())
     }
 
-    /// Calls the [`Self::process_committed_chain`] method for each backfilled block.
+    /// Calls the [`process_committed_chain`] method for each backfilled block.
     ///
     /// Listens on the `cancel_rx` channel for cancellation requests.
     #[instrument(level = "info", skip(_permit, job, backfill_tx, cancel_rx))]
@@ -184,27 +189,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         backfill_tx: mpsc::UnboundedSender<BackfillMessage>,
         cancel_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
-        let backfill = job
-            // Convert the backfill job into a parallel stream
-            .into_stream()
-            // Convert the block execution error into `eyre` error type
-            .map_err(Into::into)
-            // Process each block, returning early if an error occurs
-            .try_for_each(|(block, output)| {
-                async {
-                    let sealed_block = block.seal_slow();
-                    let execution_outcome = ExecutionOutcome::new(
-                        output.state,
-                        output.receipts.into(),
-                        sealed_block.number,
-                        vec![Requests(output.requests)],
-                    );
-                    let chain = Chain::new([sealed_block], execution_outcome, None);
-
-                    // Process the committed blocks
-                    Self::process_committed_chain(&chain).await
-                }
-            });
+        let backfill = backfill_with_job(job);
 
         tokio::select! {
             result = backfill => {
@@ -223,20 +208,61 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
             }
         }
     }
+}
 
-    /// Processes the committed chain and logs the number of blocks and transactions.
-    pub async fn process_committed_chain(chain: &Chain) -> eyre::Result<()> {
-        // Calculate the number of blocks and transactions in the committed chain
-        let blocks = chain.blocks().len();
-        let transactions = chain.blocks().values().map(|block| block.body.len()).sum::<usize>();
+/// Backfills the given range of blocks in parallel, calling the
+/// [`process_committed_chain`] method for each block.
+async fn backfill_with_job<
+    E: BlockExecutorProvider + Send,
+    P: BlockReader + HeaderProvider + StateProviderFactory + Clone + Send + Unpin + 'static,
+>(
+    job: BackfillJob<E, P>,
+) -> eyre::Result<()> {
+    job
+        // Convert the backfill job into a parallel stream
+        .into_stream()
+        // Covert the block execution error into `eyre`
+        .map_err(Into::into)
+        // Process each block, returning early if an error occurs
+        .try_for_each(|(block, output)| async {
+            let sealed_block = block.seal_slow();
+            let execution_outcome = ExecutionOutcome::new(
+                output.state,
+                output.receipts.into(),
+                sealed_block.number,
+                vec![Requests(output.requests)],
+            );
+            let chain = Chain::new([sealed_block], execution_outcome, None);
 
-        info!(first_block = %chain.execution_outcome().first_block, %blocks, %transactions, "Processed committed chain");
-        Ok(())
-    }
+            // Process the committed blocks
+            process_committed_chain(&chain)
+        })
+        .await
+}
+
+/// Processes the committed chain and logs the number of blocks and transactions.
+fn process_committed_chain(chain: &Chain) -> eyre::Result<()> {
+    // Calculate the number of blocks and transactions in the committed chain
+    let blocks = chain.blocks().len();
+    let transactions = chain.blocks().values().map(|block| block.body.len()).sum::<usize>();
+
+    info!(first_block = %chain.execution_outcome().first_block, %blocks, %transactions, "Processed committed blocks");
+    Ok(())
+}
+
+#[derive(Debug, Clone, Args)]
+struct BackfillArgsExt {
+    /// Start backfill from the specified block number
+    #[clap(long = "backfill-from-block")]
+    pub from_block: Option<u64>,
+
+    /// Stop backfill at the specified block number
+    #[clap(long = "backfill-to-block")]
+    pub to_block: Option<BlockId>,
 }
 
 fn main() -> eyre::Result<()> {
-    reth::cli::Cli::parse_args().run(|builder, _| async move {
+    reth::cli::Cli::<BackfillArgsExt>::parse().run(|builder, args| async move {
         // Create a channel for backfill requests. Sender will go to the RPC server, receiver will
         // be used by the ExEx.
         let (backfill_tx, backfill_rx) = mpsc::unbounded_channel();
@@ -252,8 +278,48 @@ fn main() -> eyre::Result<()> {
                 Ok(())
             })
             // Install the backfill ExEx.
-            .install_exex("Backfill", |ctx| async move {
-                Ok(BackfillExEx::new(ctx, exex_backfill_tx, backfill_rx, 10).start())
+            .install_exex("Backfill", move |ctx| {
+                // Rust seems to trigger a bogus higher-ranked lifetime error when using
+                // just an async closure here -- using `spawn_blocking` avoids this
+                // particular issue.
+                //
+                // To avoid the higher ranked lifetime error we use `spawn_blocking`
+                // which will move the closure to another blocking-allowed thread,
+                // then execute.
+                //
+                // Source: https://github.com/vados-cosmonic/wasmCloud/commit/440e8c377f6b02f45eacb02692e4d2fabd53a0ec
+                tokio::task::spawn_blocking(move || {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        let exex = BackfillExEx::new(ctx, exex_backfill_tx, backfill_rx, 10);
+
+                        let to_block = args
+                            .to_block
+                            // If the end of range block number is not provided, but the start of
+                            // range is, use the latest block number as
+                            // the end of range.
+                            .or(args
+                                .from_block
+                                .is_some()
+                                .then_some(BlockNumberOrTag::Latest.into()));
+                        if let Some(to_block) = to_block {
+                            let to_block =
+                                exex.ctx.provider().block_number_for_id(to_block)?.ok_or_eyre(
+                                    "end of range block number for backfill is not found",
+                                )?;
+
+                            let job = exex
+                                .backfill_job_factory
+                                .backfill(args.from_block.unwrap_or(1)..=to_block);
+
+                            backfill_with_job(job).await.map_err(|err| {
+                                eyre::eyre!("failed to backfill for the provided args: {err:?}")
+                            })?;
+                        }
+
+                        eyre::Ok(exex.start())
+                    })
+                })
+                .map(|result| result.map_err(Into::into).and_then(|result| result))
             })
             .launch()
             .await?;
