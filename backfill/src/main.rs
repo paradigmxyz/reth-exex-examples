@@ -289,32 +289,35 @@ fn main() -> eyre::Result<()> {
                 //
                 // Source: https://github.com/vados-cosmonic/wasmCloud/commit/440e8c377f6b02f45eacb02692e4d2fabd53a0ec
                 tokio::task::spawn_blocking(move || {
-                    let exex = BackfillExEx::new(ctx, exex_backfill_tx, backfill_rx, 10);
+                    tokio::runtime::Handle::current().block_on(async move {
+                        let exex = BackfillExEx::new(ctx, exex_backfill_tx, backfill_rx, 10);
 
-                    let to_block = args
-                        .to_block
-                        // If the end of range block number is not provided, but the start of range
-                        // is, use the latest block number as the end of
-                        // range.
-                        .or(args.from_block.is_some().then_some(BlockNumberOrTag::Latest.into()));
-                    if let Some(to_block) = to_block {
-                        let to_block =
-                            exex.ctx.provider().block_number_for_id(to_block)?.ok_or_eyre(
-                                "end of range block number for backfill is not found",
-                            )?;
+                        let to_block = args
+                            .to_block
+                            // If the end of range block number is not provided, but the start of
+                            // range is, use the latest block number as
+                            // the end of range.
+                            .or(args
+                                .from_block
+                                .is_some()
+                                .then_some(BlockNumberOrTag::Latest.into()));
+                        if let Some(to_block) = to_block {
+                            let to_block =
+                                exex.ctx.provider().block_number_for_id(to_block)?.ok_or_eyre(
+                                    "end of range block number for backfill is not found",
+                                )?;
 
-                        let job = exex
-                            .backfill_job_factory
-                            .backfill(args.from_block.unwrap_or(1)..=to_block);
+                            let job = exex
+                                .backfill_job_factory
+                                .backfill(args.from_block.unwrap_or(1)..=to_block);
 
-                        tokio::runtime::Handle::current().block_on(async move {
                             backfill_with_job(job).await.map_err(|err| {
                                 eyre::eyre!("failed to backfill for the provided args: {err:?}")
-                            })
-                        })?;
-                    }
+                            })?;
+                        }
 
-                    eyre::Ok(exex.start())
+                        eyre::Ok(exex.start())
+                    })
                 })
                 .map(|result| result.map_err(Into::into).and_then(|result| result))
             })
