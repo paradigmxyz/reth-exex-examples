@@ -1,3 +1,5 @@
+//! Kona Pipeline types and helper functions.
+
 use std::sync::Arc;
 
 use kona_derive::{

@@ -65,7 +65,7 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
         let mut chain_provider = LocalChainProvider::new();
         chain_provider.insert_l2_genesis_block(cfg.genesis.l1);
 
-        let mut l2_provider = AlloyL2ChainProvider::new_http(args.l2_rpc_url.clone(), cfg.clone());
+        let l2_provider = AlloyL2ChainProvider::new_http(args.l2_rpc_url.clone(), cfg.clone());
         let blob_provider = ExExBlobProvider::new_from_beacon_client(args.beacon_client_url);
         let dap = EthereumDataSource::new(chain_provider.clone(), blob_provider.clone(), &cfg);
 
@@ -85,10 +85,12 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
             )),
         };
 
-        // TODO: use static genesis block info without fetching it
-        let cursor = l2_provider.l2_block_info_by_number(cfg.genesis.l2.number).await.unwrap();
-        let tip = chain_provider.block_info_by_number(cursor.l1_origin.number).await.unwrap();
+        // Initialize the L2 cursor to the L2 genesis block
+        let l2_block_cursor = l2_genesis_info_from_cfg(&cfg);
+        let tip =
+            chain_provider.block_info_by_number(l2_block_cursor.l1_origin.number).await.unwrap();
 
+        // Finally create the derivation pipeline
         let pipeline = new_local_pipeline(
             cfg.clone(),
             chain_provider.clone(),
@@ -106,7 +108,7 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
             chain_provider,
             l2_provider,
             blob_provider,
-            l2_block_cursor: cursor,
+            l2_block_cursor,
             l1_to_l2_block_cursor: HashMap::new(),
             is_synced_to_l2_genesis: false,
             should_advance_l2_block_cursor: false,
@@ -273,11 +275,25 @@ fn main() -> Result<()> {
     })
 }
 
+/// Helper to extract block info from a sealed block
 fn info_from_header(block: &reth::primitives::SealedBlock) -> BlockInfo {
     BlockInfo {
         hash: block.hash(),
         number: block.number,
         timestamp: block.timestamp,
         parent_hash: block.parent_hash,
+    }
+}
+
+/// Helper to extract L2 genesis block info from a rollup configuration
+fn l2_genesis_info_from_cfg(cfg: &Arc<RollupConfig>) -> L2BlockInfo {
+    L2BlockInfo {
+        block_info: BlockInfo {
+            hash: cfg.genesis.l2.hash,
+            number: cfg.genesis.l2.number,
+            ..Default::default()
+        },
+        l1_origin: cfg.genesis.l1,
+        seq_num: 0,
     }
 }

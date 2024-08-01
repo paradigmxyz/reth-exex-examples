@@ -4,12 +4,18 @@ use clap::Args;
 use reqwest::Url;
 use reth::rpc::types::engine::JwtSecret;
 
+pub const DEFAULT_L2_CHAIN_ID: u64 = 10;
+
 pub const DEFAULT_L2_RPC_URL: &str = "https://optimism.llamarpc.com";
 
 pub const DEFAULT_BEACON_CLIENT_URL: &str = "http://localhost:5052";
 
 #[derive(Debug, Clone, Args)]
 pub(crate) struct KonaArgsExt {
+    /// Chain ID of the L2 network
+    #[clap(long = "kona.l2-chain-id", default_value_t = DEFAULT_L2_CHAIN_ID)]
+    pub l2_chain_id: u64,
+
     /// RPC URL of an L2 node
     #[clap(long = "kona.l2-rpc-url", default_value = DEFAULT_L2_RPC_URL)]
     pub l2_rpc_url: Url,
