@@ -6,12 +6,8 @@ use clap::{Args, Parser};
 use eyre::OptionExt;
 use futures::{FutureExt, TryStreamExt};
 use jsonrpsee::tracing::instrument;
-use reth::{
-    primitives::{BlockId, BlockNumber, BlockNumberOrTag, Requests},
-    providers::{BlockIdReader, BlockReader, HeaderProvider, StateProviderFactory},
-};
-use reth_evm::execute::BlockExecutorProvider;
-use reth_execution_types::{Chain, ExecutionOutcome};
+use reth::primitives::BlockNumber;
+use reth_execution_types::Chain;
 use reth_exex::{BackfillJob, BackfillJobFactory, ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
@@ -189,7 +185,13 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         backfill_tx: mpsc::UnboundedSender<BackfillMessage>,
         cancel_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
-        let backfill = backfill_with_job(job);
+        let backfill = job
+            // Convert the backfill job into a parallel stream
+            .into_stream()
+            // Convert the block execution error into `eyre` error type
+            .map_err(Into::into)
+            // Process each block, returning early if an error occurs
+            .try_for_each(|chain| async move { Self::process_committed_chain(&chain).await });
 
         tokio::select! {
             result = backfill => {
