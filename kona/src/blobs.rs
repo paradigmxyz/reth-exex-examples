@@ -34,7 +34,7 @@ impl InMemoryBlobProvider {
     }
 }
 
-/// [BlobProvider] for the [kona_derive::DerivationPipeline].
+/// [BlobProvider] for the Kona derivation pipeline.
 #[derive(Debug, Clone)]
 pub struct ExExBlobProvider(
     Arc<Mutex<InMemoryBlobProvider>>,

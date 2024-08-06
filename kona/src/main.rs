@@ -260,6 +260,7 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
     /// Starts the Kona Execution Extension loop.
     pub async fn start(mut self) -> Result<()> {
         // Step 1: Wait for the L2 origin block to be available
+        info!(target: "kona", "Waiting for L2 origin block to be available");
         let l2_genesis_l1_block = self.wait_for_l2_genesis_l1_block().await?;
 
         // Step 2: Initialize the derivation pipeline with the L2 origin block
