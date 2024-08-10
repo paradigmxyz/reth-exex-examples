@@ -59,11 +59,12 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
     pub async fn new(ctx: ExExContext<Node>, args: KonaArgsExt, cfg: Arc<RollupConfig>) -> Self {
         info!(target: "kona", mode = ?args.validation_mode, "Starting Kona Execution Extension");
 
-        let mut chain_provider = LocalChainProvider::new();
+        // Store data for the 512 most recent blocks to avoid unbounded memory usage
+        let mut chain_provider = LocalChainProvider::with_capacity(512);
         chain_provider.insert_l2_genesis_block(cfg.genesis.l1);
 
         let l2_provider = AlloyL2ChainProvider::new_http(args.l2_rpc_url.clone(), cfg.clone());
-        let blob_provider = ExExBlobProvider::new_from_beacon_client(args.beacon_client_url);
+        let blob_provider = ExExBlobProvider::new(args.beacon_client_url, args.blob_archiver_url);
 
         let validator: Box<dyn AttributesValidator + Send> = match args.validation_mode {
             ValidationMode::Trusted => Box::new(TrustedValidator::new_http(
@@ -243,7 +244,6 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
                     self.chain_provider.commit(committed_chain);
 
                     if tip.number >= self.cfg.genesis.l1.number {
-                        debug!(target: "kona", "Chain synced to rollup genesis with L1 block number: {}", tip.number);
                         break Ok(tip);
                     } else {
                         trace!(target: "kona", "Chain not yet synced to rollup genesis. L1 block number: {}", tip.number);
@@ -260,11 +260,12 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
     /// Starts the Kona Execution Extension loop.
     pub async fn start(mut self) -> Result<()> {
         // Step 1: Wait for the L2 origin block to be available
-        info!(target: "kona", "Waiting for L2 origin block to be available");
         let l2_genesis_l1_block = self.wait_for_l2_genesis_l1_block().await?;
+        info!(target: "kona", "Chain synced to rollup genesis at L1 block {}", l2_genesis_l1_block.number);
 
         // Step 2: Initialize the derivation pipeline with the L2 origin block
         let mut pipeline = self.init_pipeline(l2_genesis_l1_block).await;
+        info!(target: "kona", "Initialized local derivation pipeline");
 
         // Step 3: Start the main loop
         loop {

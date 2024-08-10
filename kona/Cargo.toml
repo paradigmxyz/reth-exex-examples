@@ -7,11 +7,14 @@ license.workspace = true
 
 [dependencies]
 # kona
-kona-derive = { git = "https://github.com/ethereum-optimism/kona", rev = "4ef271b", features = ["online", "serde"] }
+kona-derive = { git = "https://github.com/ethereum-optimism/kona", rev = "e069eb4", features = ["online", "serde"] }
 superchain-registry = { version = "0.2.2", default-features = false }
 
 # needed for compatibility with kona's ChainProvider trait
 anyhow = { version = "1.0.86", default-features = false }
+
+# added for size-bounded local providers
+hashmore = { git = "https://github.com/merklefruit/hashmore", rev = "24f7907" }
 
 # reth
 reth.workspace = true

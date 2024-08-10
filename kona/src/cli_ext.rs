@@ -25,7 +25,20 @@ pub(crate) struct KonaArgsExt {
     #[clap(long = "kona.beacon-client-url", default_value = DEFAULT_BEACON_CLIENT_URL)]
     pub beacon_client_url: Url,
 
-    /// The payload validation mode to use
+    /// URL of the blob archiver to fetch blobs that are expired on
+    /// the beacon client but still needed for processing.
+    ///
+    /// Blob archivers need to implement the `blob_sidecars` API:
+    /// <https://ethereum.github.io/beacon-APIs/#/Beacon/getBlobSidecars>
+    #[clap(long = "kona.blob-archiver-url")]
+    pub blob_archiver_url: Option<Url>,
+
+    /// The payload validation mode to use.
+    ///
+    /// - Trusted: rely on a trusted synced L2 execution client. Validation happens by fetching the
+    ///   same block and comparing the results.
+    /// - Engine API: use a local or remote engine API of an L2 execution client. Validation
+    ///   happens by sending the `new_payload` to the API and expecting a VALID response.
     #[clap(
         long = "kona.validation-mode",
         default_value = "trusted",
@@ -33,11 +46,12 @@ pub(crate) struct KonaArgsExt {
     )]
     pub validation_mode: ValidationMode,
 
-    /// If the mode is "engine api", we also need an URL for it.
+    /// If the mode is "engine api", we also need an URL for the engine API endpoint of
+    /// the execution client to validate the payload.
     #[clap(long = "kona.l2-engine-api-url")]
     pub l2_engine_api_url: Option<Url>,
 
-    /// If the mode is "engine api", we also need a JWT secret for it.
+    /// If the mode is "engine api", we also need a JWT secret for the auth-rpc.
     /// This MUST be a valid path to a file containing the hex-encoded JWT secret.
     #[clap(long = "kona.l2-engine-jwt")]
     pub l2_engine_jwt_secret: Option<PathBuf>,

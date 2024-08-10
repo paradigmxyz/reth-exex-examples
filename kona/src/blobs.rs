@@ -1,83 +1,98 @@
 //! Blob Provider
 
-use std::{boxed::Box, collections::HashMap, sync::Arc};
+use std::{boxed::Box, sync::Arc};
 
 use async_trait::async_trait;
+use hashmore::FIFOMap;
 use kona_derive::{
-    online::{OnlineBeaconClient, OnlineBlobProvider, SimpleSlotDerivation},
+    online::{
+        OnlineBeaconClient, OnlineBlobProviderBuilder, OnlineBlobProviderWithFallback,
+        SimpleSlotDerivation,
+    },
     traits::BlobProvider,
     types::{alloy_primitives::B256, Blob, BlobProviderError, BlockInfo, IndexedBlobHash},
 };
 use parking_lot::Mutex;
 use reqwest::Url;
+use tracing::warn;
 
-/// Fallback online blob provider.
-pub type OnlineBlobFallback = OnlineBlobProvider<OnlineBeaconClient, SimpleSlotDerivation>;
+/// [BlobProvider] for the Kona derivation pipeline.
+#[derive(Debug, Clone)]
+pub struct ExExBlobProvider {
+    /// In-memory blob provider, used for locally caching blobs as
+    /// they come during live sync (when following the chain tip).
+    memory: Arc<Mutex<InMemoryBlobProvider>>,
+    /// Fallback online blob provider.
+    /// This is used primarily during sync when archived blobs
+    /// aren't provided by reth since they'll be too old.
+    ///
+    /// The `WithFallback` setup allows to specify two different
+    /// endpoints for a primary and a fallback blob provider.
+    online: OnlineBlobProviderWithFallback<
+        OnlineBeaconClient,
+        OnlineBeaconClient,
+        SimpleSlotDerivation,
+    >,
+}
 
 /// A blob provider that hold blobs in memory.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct InMemoryBlobProvider {
     /// Maps block hashes to blobs.
-    blocks_to_blob: HashMap<B256, Vec<Blob>>,
+    blocks_to_blob: FIFOMap<B256, Vec<Blob>>,
 }
 
 impl InMemoryBlobProvider {
     /// Creates a new [InMemoryBlobProvider].
-    pub fn new() -> Self {
-        Self { blocks_to_blob: HashMap::new() }
+    pub fn with_capacity(cap: usize) -> Self {
+        Self { blocks_to_blob: FIFOMap::with_capacity(cap) }
     }
 
     /// Inserts multiple blobs into the provider.
     #[allow(unused)]
     pub fn insert_blobs(&mut self, block_hash: B256, blobs: Vec<Blob>) {
-        self.blocks_to_blob.entry(block_hash).or_default().extend(blobs);
+        if let Some(existing_blobs) = self.blocks_to_blob.get_mut(&block_hash) {
+            existing_blobs.extend(blobs);
+        } else {
+            self.blocks_to_blob.insert(block_hash, blobs);
+        }
     }
 }
 
-/// [BlobProvider] for the Kona derivation pipeline.
-#[derive(Debug, Clone)]
-pub struct ExExBlobProvider(
-    Arc<Mutex<InMemoryBlobProvider>>,
-    /// Fallback online blob provider.
-    /// This is used primarily during sync when archived blobs
-    /// aren't provided by reth since they'll be too old.
-    OnlineBlobFallback,
-);
-
 impl ExExBlobProvider {
-    /// Creates a new [ExExBlobProvider] with a local blob store and a
-    /// fallback online beacon client.
-    pub fn new_from_beacon_client(beacon_client_url: Url) -> Self {
-        let beacon = OnlineBeaconClient::new_http(beacon_client_url.to_string());
-        let blob_provider = OnlineBlobProvider::<_, SimpleSlotDerivation>::new(beacon, None, None);
-        let blob_store = Arc::new(Mutex::new(InMemoryBlobProvider::new()));
-        Self::new(Arc::clone(&blob_store), blob_provider)
-    }
+    /// Creates a new [ExExBlobProvider] with a local blob store, an online primary beacon
+    /// client and an optional fallback blob archiver for fetching blobs.
+    pub fn new(beacon_client_url: Url, blob_archiver_url: Option<Url>) -> Self {
+        let memory = Arc::new(Mutex::new(InMemoryBlobProvider::with_capacity(256)));
 
-    /// Creates a new [ExExBlobProvider].
-    pub fn new(inner: Arc<Mutex<InMemoryBlobProvider>>, fallback: OnlineBlobFallback) -> Self {
-        Self(inner, fallback)
+        let online = OnlineBlobProviderBuilder::new()
+            .with_primary(beacon_client_url.to_string())
+            .with_fallback(blob_archiver_url.map(|url| url.to_string()))
+            .build();
+
+        Self { memory, online }
     }
 
     /// Inserts multiple blobs into the in-memory provider.
     pub fn insert_blobs(&mut self, block_hash: B256, blobs: Vec<Blob>) {
-        self.0.lock().insert_blobs(block_hash, blobs);
+        self.memory.lock().insert_blobs(block_hash, blobs);
     }
 
-    /// Attempts to fetch blobs using the inner blob store.
-    async fn inner_blob_load(
+    /// Attempts to fetch blobs using the in-memory blob store.
+    async fn memory_blob_load(
         &mut self,
         block_ref: &BlockInfo,
         hashes: &[IndexedBlobHash],
     ) -> eyre::Result<Vec<Blob>> {
-        let err =
-            |block_ref: &BlockInfo| eyre::eyre!("Blob not found for block ref: {:?}", block_ref);
+        let locked = self.memory.lock();
 
-        let locked = self.0.lock();
-        let blobs_for_block =
-            locked.blocks_to_blob.get(&block_ref.hash).ok_or_else(|| err(block_ref))?;
+        let blobs_for_block = locked
+            .blocks_to_blob
+            .get(&block_ref.hash)
+            .ok_or_else(|| eyre::eyre!("Blob not found for block ref: {:?}", block_ref))?;
+
         let mut blobs = Vec::new();
-        for _blob_hash in hashes {
+        for _ in hashes {
             for blob in blobs_for_block {
                 blobs.push(*blob);
             }
@@ -95,10 +110,11 @@ impl BlobProvider for ExExBlobProvider {
         block_ref: &BlockInfo,
         blob_hashes: &[IndexedBlobHash],
     ) -> Result<Vec<Blob>, BlobProviderError> {
-        if let Ok(b) = self.inner_blob_load(block_ref, blob_hashes).await {
+        if let Ok(b) = self.memory_blob_load(block_ref, blob_hashes).await {
             return Ok(b);
+        } else {
+            warn!(target: "blob-provider", "Blob provider falling back to online provider");
+            self.online.get_blobs(block_ref, blob_hashes).await
         }
-        tracing::warn!(target: "blob-provider", "Blob provider falling back to online provider");
-        self.1.get_blobs(block_ref, blob_hashes).await
     }
 }

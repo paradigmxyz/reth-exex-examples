@@ -1,7 +1,10 @@
 //! Local in-memory providers.
 
+use std::sync::Arc;
+
 use anyhow::Result;
 use async_trait::async_trait;
+use hashmore::FIFOMap;
 use kona_derive::{
     traits::ChainProvider,
     types::{
@@ -9,32 +12,61 @@ use kona_derive::{
         TxEip4844, TxEip4844Variant, TxEnvelope, TxLegacy,
     },
 };
+use parking_lot::RwLock;
 use reth::{primitives::Transaction, providers::Chain};
-use std::{collections::HashMap, sync::Arc};
 
-/// An in-memory [ChainProvider] that stores chain data.
-#[derive(Debug, Default, Clone)]
-pub struct LocalChainProvider {
-    /// Maps [B256] hash to [Header].
-    hash_to_header: HashMap<B256, Header>,
-
-    /// Maps [B256] hash to [BlockInfo].
-    hash_to_block_info: HashMap<B256, BlockInfo>,
-
-    /// Maps [B256] hash to [Vec]<[Receipt]>.
-    hash_to_receipts: HashMap<B256, Vec<Receipt>>,
-
-    /// Maps a [B256] hash to a [Vec]<[TxEnvelope]>.
-    hash_to_txs: HashMap<B256, Vec<TxEnvelope>>,
-}
+/// An in-memory [ChainProvider] that stores chain data,
+/// meant to be shared between multiple readers.
+///
+/// This provider is implemented with `FIFOMap`s to avoid
+/// storing an unbounded amount of data.
+#[derive(Debug, Clone)]
+pub struct LocalChainProvider(Arc<RwLock<LocalChainProviderInner>>);
 
 impl LocalChainProvider {
-    pub fn new() -> Self {
-        Self::default()
+    /// Create a new [LocalChainProvider] with the given capacity.
+    pub fn with_capacity(cap: usize) -> Self {
+        Self(Arc::new(RwLock::new(LocalChainProviderInner::with_capacity(cap))))
     }
 
     /// Commits Chain state to the provider.
     pub fn commit(&mut self, chain: Arc<Chain>) {
+        self.0.write().commit(chain);
+    }
+
+    /// Inserts the L2 genesis [BlockID] into the provider.
+    pub fn insert_l2_genesis_block(&mut self, block: BlockID) {
+        self.0.write().insert_l2_genesis_block(block);
+    }
+}
+
+#[derive(Debug)]
+struct LocalChainProviderInner {
+    /// Maps [B256] hash to [Header].
+    hash_to_header: FIFOMap<B256, Header>,
+
+    /// Maps [B256] hash to [BlockInfo].
+    hash_to_block_info: FIFOMap<B256, BlockInfo>,
+
+    /// Maps [B256] hash to [Vec]<[Receipt]>.
+    hash_to_receipts: FIFOMap<B256, Vec<Receipt>>,
+
+    /// Maps a [B256] hash to a [Vec]<[TxEnvelope]>.
+    hash_to_txs: FIFOMap<B256, Vec<TxEnvelope>>,
+}
+
+impl LocalChainProviderInner {
+    fn with_capacity(cap: usize) -> Self {
+        Self {
+            hash_to_header: FIFOMap::with_capacity(cap),
+            hash_to_block_info: FIFOMap::with_capacity(cap),
+            hash_to_receipts: FIFOMap::with_capacity(cap),
+            hash_to_txs: FIFOMap::with_capacity(cap),
+        }
+    }
+
+    /// Commits Chain state to the provider.
+    fn commit(&mut self, chain: Arc<Chain>) {
         self.commit_headers(&chain);
         self.commit_block_infos(&chain);
         self.commit_receipts(&chain);
@@ -90,7 +122,7 @@ impl LocalChainProvider {
     }
 
     /// Inserts the L2 genesis [BlockID] into the provider.
-    pub fn insert_l2_genesis_block(&mut self, block: BlockID) {
+    fn insert_l2_genesis_block(&mut self, block: BlockID) {
         self.hash_to_block_info.insert(
             block.hash,
             BlockInfo {
@@ -240,13 +272,20 @@ impl LocalChainProvider {
 impl ChainProvider for LocalChainProvider {
     /// Fetch the L1 [Header] for the given [B256] hash.
     async fn header_by_hash(&mut self, hash: B256) -> Result<Header> {
-        self.hash_to_header.get(&hash).cloned().ok_or_else(|| anyhow::anyhow!("Header not found"))
+        self.0
+            .read()
+            .hash_to_header
+            .get(&hash)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Header not found"))
     }
 
     /// Returns the block at the given number, or an error if the block does not exist in the data
     /// source.
     async fn block_info_by_number(&mut self, number: u64) -> Result<BlockInfo> {
-        self.hash_to_block_info
+        self.0
+            .read()
+            .hash_to_block_info
             .values()
             .find(|bi| bi.number == number)
             .cloned()
@@ -256,7 +295,9 @@ impl ChainProvider for LocalChainProvider {
     /// Returns all receipts in the block with the given hash, or an error if the block does not
     /// exist in the data source.
     async fn receipts_by_hash(&mut self, hash: B256) -> Result<Vec<Receipt>> {
-        self.hash_to_receipts
+        self.0
+            .read()
+            .hash_to_receipts
             .get(&hash)
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("Receipts not found"))
@@ -268,12 +309,21 @@ impl ChainProvider for LocalChainProvider {
         hash: B256,
     ) -> Result<(BlockInfo, Vec<TxEnvelope>)> {
         let block_info = self
+            .0
+            .read()
             .hash_to_block_info
             .get(&hash)
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("Block not found"))?;
-        let txs =
-            self.hash_to_txs.get(&hash).cloned().ok_or_else(|| anyhow::anyhow!("Tx not found"))?;
+
+        let txs = self
+            .0
+            .read()
+            .hash_to_txs
+            .get(&hash)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Tx not found"))?;
+
         Ok((block_info, txs))
     }
 }
