@@ -6,6 +6,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+base64.workspace = true
+eyre.workspace = true
 reqwest = "0.12.5"
 serde_json.workspace = true
 tokio.workspace = true

@@ -9853,6 +9853,8 @@ dependencies = [
 name = "wasm_send"
 version = "0.0.0"
 dependencies = [
+ "base64 0.22.1",
+ "eyre",
  "reqwest",
  "serde_json",
  "tokio",
