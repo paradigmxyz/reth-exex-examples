@@ -28,7 +28,7 @@ async fn main() -> eyre::Result<()> {
         "method": "exex_install",
         "params": {
             "name": "my_wasm_module",
-            "bytecode": wasm_base64
+            "wasm_base64": wasm_base64
         },
         "id": 1
     });
