@@ -1,5 +1,5 @@
 [workspace]
-members = ["wasm_exex"]
+members = ["wasm_exex", "wasm_send"]
 
 [workspace.package]
 version = "0.0.0"
