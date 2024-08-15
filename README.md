@@ -15,3 +15,7 @@ cargo build -r --target wasm32-unknown-unknown
 ```console
 cargo run -- http://127.0.0.1:8545 ../target/wasm32-unknown-unknown/release/wasm-exex.wasm
 ```
+
+```console
+cr -p wasm_send -- start http://127.0.0.1:8545 my_wasm_module
+```

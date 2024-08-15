@@ -25,6 +25,7 @@ async fn main() -> eyre::Result<()> {
             let name = &args[3];
             start(url, name).await?
         }
+
         _ => println!("Invalid subcommand. Use 'install' or 'start'."),
     }
 
@@ -50,8 +51,9 @@ async fn install(url: &str, name: &str, wasm_file_path: &str) -> eyre::Result<()
 
     let client = Client::new();
     let res = client.post(url).json(&payload).send().await?;
+    let res = res.json::<serde_json::Value>().await?;
 
-    println!("Install Response: {:?}", res.text().await?);
+    println!("{}", serde_json::to_string_pretty(&res)?);
 
     Ok(())
 }
@@ -68,8 +70,9 @@ async fn start(url: &str, name: &str) -> eyre::Result<()> {
 
     let client = Client::new();
     let res = client.post(url).json(&payload).send().await?;
+    let res = res.json::<serde_json::Value>().await?;
 
-    println!("Start Response: {:?}", res.text().await?);
+    println!("{}", serde_json::to_string_pretty(&res)?);
 
     Ok(())
 }
