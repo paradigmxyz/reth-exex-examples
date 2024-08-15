@@ -1,11 +1,16 @@
 mod rpc;
 mod wasm;
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+    sync::Arc,
+};
 
 use base64::{prelude::*, Engine};
 use jsonrpsee::core::RpcResult;
 use reth::dirs::{LogsDir, PlatformPath};
+use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
@@ -14,6 +19,7 @@ use rpc::{rpc_internal_error_format, ExExRpcExt, ExExRpcExtApiServer, RpcMessage
 use tokio::sync::{mpsc, oneshot};
 use wasi_common::WasiCtx;
 use wasm::RunningExEx;
+use wasm_send::{install_wasm, start_wasm};
 use wasmtime::{Engine as WasmTimeEngine, Linker, Module};
 
 struct WasmExEx<Node: FullNodeComponents> {
@@ -78,7 +84,7 @@ impl<Node: FullNodeComponents> WasmExEx<Node> {
             self.ctx.events.send(ExExEvent::FinishedHeight(tip))?;
         }
 
-        info!(?committed_chain_tip, "Handled notification");
+        info!("Handled notification");
 
         Ok(())
     }
@@ -129,23 +135,44 @@ impl<Node: FullNodeComponents> WasmExEx<Node> {
 fn main() -> eyre::Result<()> {
     reth::cli::Cli::parse_args().run(|builder, _| async move {
         let (rpc_tx, rpc_rx) = mpsc::unbounded_channel();
-
+        let (notification_sender, notification_receiver) = mpsc::channel(100);
         let handle = builder
             .node(EthereumNode::default())
             .extend_rpc_modules(move |ctx| {
                 ctx.modules.merge_configured(ExExRpcExt { to_exex: rpc_tx }.into_rpc())?;
                 Ok(())
             })
-            .install_exex("Minimal", |ctx| async move {
+            .install_exex("Minimal", |mut ctx| async move {
                 // TODO(alexey): obviously bad but we don't have access to log args in the context
                 let logs_directory = PlatformPath::<LogsDir>::default()
                     .with_chain(ctx.config.chain.chain, ctx.config.datadir.clone())
                     .as_ref()
                     .to_path_buf();
+
+                ctx.notifications = notification_receiver;
+
                 Ok(WasmExEx::new(ctx, rpc_rx, logs_directory)?.start())
             })
             .launch()
             .await?;
+
+        install_wasm(
+            "http://127.0.0.1:8545",
+            "Minimal",
+            "./target/wasm32-wasi/release/wasm-exex.wasi.wasm",
+        )
+        .await?;
+        start_wasm("http://127.0.0.1:8545", "Minimal").await?;
+
+        // send mock notification
+        let notification = ExExNotification::ChainCommitted {
+            new: Arc::new(Chain::from_block(
+                Default::default(),
+                Default::default(),
+                Default::default(),
+            )),
+        };
+        notification_sender.send(notification).await?;
 
         handle.wait_for_node_exit().await
     })

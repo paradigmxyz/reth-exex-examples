@@ -9744,6 +9744,7 @@ dependencies = [
  "futures",
  "jsonrpsee",
  "reth",
+ "reth-execution-types",
  "reth-exex",
  "reth-exex-test-utils",
  "reth-exex-types",
@@ -9753,6 +9754,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "wasi-common",
+ "wasm_send",
  "wasmtime",
 ]
 

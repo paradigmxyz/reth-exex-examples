@@ -8,6 +8,9 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
+# wasm
+wasm_send = { path = "./wasm_send" }
+
 # reth
 reth-exex-types = { git = "https://github.com/paradigmxyz/reth" }
 reth-exex = { git = "https://github.com/paradigmxyz/reth", features = [
@@ -16,6 +19,7 @@ reth-exex = { git = "https://github.com/paradigmxyz/reth", features = [
 reth-node-api = { git = "https://github.com/paradigmxyz/reth" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth" }
 reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
+reth-execution-types = { git = "https://github.com/paradigmxyz/reth" }
 reth = { git = "https://github.com/paradigmxyz/reth" }
 
 # async
@@ -41,11 +45,14 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+wasm_send.workspace = true
+
 # reth
 reth-exex-types.workspace = true
 reth-exex.workspace = true
 reth-node-api.workspace = true
 reth-node-ethereum.workspace = true
+reth-execution-types.workspace = true
 reth-tracing.workspace = true
 reth.workspace = true
 

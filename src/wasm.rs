@@ -1,5 +1,6 @@
 use std::{fs::File, path::Path};
 
+use jsonrpsee::tracing::info;
 use reth_tracing::tracing::debug;
 use wasi_common::{pipe::WritePipe, sync::WasiCtxBuilder, WasiCtx};
 use wasmtime::{Engine, Linker, Memory, Module, Store, TypedFunc};
@@ -72,16 +73,18 @@ impl RunningExEx {
             .call(&mut self.store, (data_size,))
             .map_err(|err| eyre::eyre!("failed to call alloc func: {err}"))?;
 
-        // Write the notification to the allocated memory.
+        // // Write the notification to the allocated memory.
         self.memory.write(&mut self.store, data_ptr as usize, &serialized_notification)?;
 
-        // Call the notification function that will read the allocated memoyry.
+        // // Call the notification function that will read the allocated memoyry.
         let output = self
             .process_func
             .call(&mut self.store, (data_ptr, data_size))
             .map_err(|err| eyre::eyre!("failed to call notification func: {err}"))?;
 
-        debug!(target: "wasm", name = %self.name, ?data_ptr, ?data_size, ?output, "Processed notification");
+        info!(target: "wasm", name = %self.name, ?data_ptr, ?data_size, ?output, "Processed notification");
+
+        info!("processed notification");
 
         Ok(())
     }
