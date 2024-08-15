@@ -26,7 +26,7 @@ pub struct ExExRpcExt {
 
 #[derive(Debug)]
 pub enum RpcMessage {
-    Install(String, Vec<u8>),
+    Install(String, String),
     Start(String),
     Stop(String),
 }
