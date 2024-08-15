@@ -9,7 +9,7 @@ use std::io::Read;
 async fn main() -> eyre::Result<()> {
     // Get the JSON-RPC URL endpoint and WASM file path from command line arguments
     let args: Vec<String> = std::env::args().collect();
-    ensure!(args.len() < 3, "<JSON-RPC URL> <WASM file path>");
+    ensure!(args.len() >= 3, "<JSON-RPC URL> <WASM file path>");
 
     let url = &args[1];
     let wasm_file_path = &args[2];
