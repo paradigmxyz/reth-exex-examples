@@ -10,12 +10,12 @@ export ETHERSCAN_API_KEY={ETHERSCAN_API_KEY} && cargo run -- node --debug.ethers
 cargo build -r --target wasm32-unknown-unknown
 ```
 
-### Send wasm (/wasm_send)
+### Send wasm
 
 ```console
-cargo run -- http://127.0.0.1:8545 ../target/wasm32-unknown-unknown/release/wasm-exex.wasm
+cargo wasm_install
 ```
 
 ```console
-cr -p wasm_send -- start http://127.0.0.1:8545 my_wasm_module
+cargo wasm_send
 ```

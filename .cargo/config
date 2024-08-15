@@ -1,0 +1,3 @@
+[alias]
+wasm_install = "run -p wasm_send -- install http://127.0.0.1:8545 my_wasm_module ./target/wasm32-unknown-unknown/release/wasm-exex.wasm"
+wasm_start = "run -p wasm_send -- start http://127.0.0.1:8545 my_wasm_module"
