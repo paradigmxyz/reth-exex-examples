@@ -1,4 +1,5 @@
 use base64::prelude::*;
+use eyre::ensure;
 use reqwest::Client;
 use serde_json::json;
 use std::fs::File;
@@ -8,9 +9,7 @@ use std::io::Read;
 async fn main() -> eyre::Result<()> {
     // Get the JSON-RPC URL endpoint and WASM file path from command line arguments
     let args: Vec<String> = std::env::args().collect();
-    if args.len() < 3 {
-        return Err("Please provide the JSON-RPC URL endpoint as the first argument and the WASM file path as the second argument".into());
-    }
+    ensure!(args.len() < 3, "<JSON-RPC URL> <WASM file path>");
 
     let url = &args[1];
     let wasm_file_path = &args[2];
