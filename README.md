@@ -6,8 +6,16 @@ export ETHERSCAN_API_KEY={ETHERSCAN_API_KEY} && cargo run -- node --debug.ethers
 
 ### Build wasm (/wasm_exex)
 
+- download https://github.com/bytecodealliance/cargo-wasi
+
 ```console
-cargo build -r --target wasm32-unknown-unknown
+cargo install cargo-wasi
+```
+
+- build wasi
+
+```console
+cargo wasi build --release
 ```
 
 ### Send wasm
