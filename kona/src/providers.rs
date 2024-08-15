@@ -1,10 +1,12 @@
 //! Local in-memory providers.
 
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
 use anyhow::Result;
 use async_trait::async_trait;
-use hashmore::FIFOMap;
 use kona_derive::{
     traits::ChainProvider,
     types::{
@@ -42,31 +44,56 @@ impl LocalChainProvider {
 
 #[derive(Debug)]
 struct LocalChainProviderInner {
+    /// The maximum number of items to store in the provider.
+    /// This is used to prevent unbounded memory usage.
+    capacity: usize,
+
+    /// The order in which keys were inserted into the provider.
+    /// This is used to evict the oldest items when the provider
+    /// reaches its capacity.
+    key_order: VecDeque<B256>,
+
     /// Maps [B256] hash to [Header].
-    hash_to_header: FIFOMap<B256, Header>,
+    hash_to_header: HashMap<B256, Header>,
 
     /// Maps [B256] hash to [BlockInfo].
-    hash_to_block_info: FIFOMap<B256, BlockInfo>,
+    hash_to_block_info: HashMap<B256, BlockInfo>,
 
     /// Maps [B256] hash to [Vec]<[Receipt]>.
-    hash_to_receipts: FIFOMap<B256, Vec<Receipt>>,
+    hash_to_receipts: HashMap<B256, Vec<Receipt>>,
 
     /// Maps a [B256] hash to a [Vec]<[TxEnvelope]>.
-    hash_to_txs: FIFOMap<B256, Vec<TxEnvelope>>,
+    hash_to_txs: HashMap<B256, Vec<TxEnvelope>>,
 }
 
 impl LocalChainProviderInner {
     fn with_capacity(cap: usize) -> Self {
         Self {
-            hash_to_header: FIFOMap::with_capacity(cap),
-            hash_to_block_info: FIFOMap::with_capacity(cap),
-            hash_to_receipts: FIFOMap::with_capacity(cap),
-            hash_to_txs: FIFOMap::with_capacity(cap),
+            capacity: cap,
+            key_order: VecDeque::new(),
+            hash_to_header: HashMap::with_capacity(cap),
+            hash_to_block_info: HashMap::with_capacity(cap),
+            hash_to_receipts: HashMap::with_capacity(cap),
+            hash_to_txs: HashMap::with_capacity(cap),
         }
     }
 
     /// Commits Chain state to the provider.
     fn commit(&mut self, chain: Arc<Chain>) {
+        // Remove the oldest items if the provider is at capacity.
+        self.key_order.extend(chain.headers().map(|h| h.hash()));
+        if self.key_order.len() > self.capacity {
+            let to_remove = self.key_order.len() - self.capacity;
+            for _ in 0..to_remove {
+                if let Some(key) = self.key_order.pop_front() {
+                    self.hash_to_header.remove(&key);
+                    self.hash_to_block_info.remove(&key);
+                    self.hash_to_receipts.remove(&key);
+                    self.hash_to_txs.remove(&key);
+                }
+            }
+        }
+
         self.commit_headers(&chain);
         self.commit_block_infos(&chain);
         self.commit_receipts(&chain);

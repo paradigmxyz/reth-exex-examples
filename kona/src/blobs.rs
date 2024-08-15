@@ -1,9 +1,12 @@
 //! Blob Provider
 
-use std::{boxed::Box, sync::Arc};
+use std::{
+    boxed::Box,
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
-use hashmore::FIFOMap;
 use kona_derive::{
     online::{
         OnlineBeaconClient, OnlineBlobProviderBuilder, OnlineBlobProviderWithFallback,
@@ -22,6 +25,7 @@ pub struct ExExBlobProvider {
     /// In-memory blob provider, used for locally caching blobs as
     /// they come during live sync (when following the chain tip).
     memory: Arc<Mutex<InMemoryBlobProvider>>,
+
     /// Fallback online blob provider.
     /// This is used primarily during sync when archived blobs
     /// aren't provided by reth since they'll be too old.
@@ -38,14 +42,22 @@ pub struct ExExBlobProvider {
 /// A blob provider that hold blobs in memory.
 #[derive(Debug)]
 pub struct InMemoryBlobProvider {
+    /// Maximum number of blobs to keep in memory.
+    capacity: usize,
+    /// Order of key insertion for oldest entry eviction.
+    key_order: VecDeque<B256>,
     /// Maps block hashes to blobs.
-    blocks_to_blob: FIFOMap<B256, Vec<Blob>>,
+    blocks_to_blob: HashMap<B256, Vec<Blob>>,
 }
 
 impl InMemoryBlobProvider {
     /// Creates a new [InMemoryBlobProvider].
     pub fn with_capacity(cap: usize) -> Self {
-        Self { blocks_to_blob: FIFOMap::with_capacity(cap) }
+        Self {
+            capacity: cap,
+            blocks_to_blob: HashMap::with_capacity(cap),
+            key_order: VecDeque::with_capacity(cap),
+        }
     }
 
     /// Inserts multiple blobs into the provider.
@@ -54,6 +66,11 @@ impl InMemoryBlobProvider {
         if let Some(existing_blobs) = self.blocks_to_blob.get_mut(&block_hash) {
             existing_blobs.extend(blobs);
         } else {
+            if self.blocks_to_blob.len() >= self.capacity {
+                if let Some(oldest) = self.key_order.pop_front() {
+                    self.blocks_to_blob.remove(&oldest);
+                }
+            }
             self.blocks_to_blob.insert(block_hash, blobs);
         }
     }

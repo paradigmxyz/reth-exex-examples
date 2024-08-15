@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use clap::Parser;
-use eyre::{bail, Result};
+use eyre::{bail, eyre, Result};
 use kona_derive::{
     online::{AlloyL2ChainProvider, EthereumDataSource},
     traits::{ChainProvider, L2ChainProvider, OriginProvider, Pipeline, StepResult},
@@ -12,7 +12,7 @@ use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
 use superchain_registry::ROLLUP_CONFIGS;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, warn};
 
 mod blobs;
 use blobs::ExExBlobProvider;
@@ -180,7 +180,7 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
                     .chain_provider
                     .block_info_by_number(bi.l1_origin.number)
                     .await
-                    .map_err(|e| eyre::eyre!(e))?;
+                    .map_err(|e| eyre!(e))?;
 
                 self.l1_to_l2_block_cursor.insert(tip, bi);
                 self.l2_block_cursor = bi;
@@ -236,7 +236,7 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
     }
 
     /// Wait for the L2 genesis L1 block (aka "origin block") to be available in the L1 chain.
-    async fn wait_for_l2_genesis_l1_block(&mut self) -> Result<BlockInfo> {
+    async fn wait_for_l2_genesis_l1_block(&mut self) -> Result<()> {
         loop {
             if let Some(notification) = self.ctx.notifications.recv().await {
                 if let Some(committed_chain) = notification.committed_chain() {
@@ -244,9 +244,9 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
                     self.chain_provider.commit(committed_chain);
 
                     if tip.number >= self.cfg.genesis.l1.number {
-                        break Ok(tip);
+                        break Ok(());
                     } else {
-                        trace!(target: "kona", "Chain not yet synced to rollup genesis. L1 block number: {}", tip.number);
+                        debug!(target: "kona", "Chain not yet synced to rollup genesis. L1 block number: {}", tip.number);
                     }
 
                     if let Err(err) = self.ctx.events.send(ExExEvent::FinishedHeight(tip.number)) {
@@ -260,11 +260,11 @@ impl<Node: FullNodeComponents> KonaExEx<Node> {
     /// Starts the Kona Execution Extension loop.
     pub async fn start(mut self) -> Result<()> {
         // Step 1: Wait for the L2 origin block to be available
-        let l2_genesis_l1_block = self.wait_for_l2_genesis_l1_block().await?;
-        info!(target: "kona", "Chain synced to rollup genesis at L1 block {}", l2_genesis_l1_block.number);
+        self.wait_for_l2_genesis_l1_block().await?;
+        info!(target: "kona", "Chain synced to rollup genesis");
 
         // Step 2: Initialize the derivation pipeline with the L2 origin block
-        let mut pipeline = self.init_pipeline(l2_genesis_l1_block).await;
+        let mut pipeline = self.init_pipeline(self.l2_block_cursor.block_info).await;
         info!(target: "kona", "Initialized local derivation pipeline");
 
         // Step 3: Start the main loop
