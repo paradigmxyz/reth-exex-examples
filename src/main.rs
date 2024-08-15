@@ -3,6 +3,7 @@ mod wasm;
 
 use std::{collections::HashMap, path::PathBuf};
 
+use base64::{prelude::*, Engine};
 use jsonrpsee::core::RpcResult;
 use reth::dirs::{LogsDir, PlatformPath};
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
@@ -13,14 +14,14 @@ use rpc::{rpc_internal_error_format, ExExRpcExt, ExExRpcExtApiServer, RpcMessage
 use tokio::sync::{mpsc, oneshot};
 use wasi_common::WasiCtx;
 use wasm::RunningExEx;
-use wasmtime::{Engine, Linker, Module};
+use wasmtime::{Engine as WasmTimeEngine, Linker, Module};
 
 struct WasmExEx<Node: FullNodeComponents> {
     ctx: ExExContext<Node>,
     rpc_messages: mpsc::UnboundedReceiver<(RpcMessage, oneshot::Sender<RpcResult<()>>)>,
     logs_directory: PathBuf,
 
-    engine: Engine,
+    engine: WasmTimeEngine,
     linker: Linker<WasiCtx>,
 
     installed_exexes: HashMap<String, Module>,
@@ -33,7 +34,7 @@ impl<Node: FullNodeComponents> WasmExEx<Node> {
         rpc_messages: mpsc::UnboundedReceiver<(RpcMessage, oneshot::Sender<RpcResult<()>>)>,
         logs_directory: PathBuf,
     ) -> eyre::Result<Self> {
-        let engine = Engine::default();
+        let engine = WasmTimeEngine::default();
         let mut linker = Linker::<WasiCtx>::new(&engine);
         wasi_common::sync::add_to_linker(&mut linker, |s| s)
             .map_err(|err| eyre::eyre!("failed to add WASI: {err}"))?;
@@ -84,12 +85,11 @@ impl<Node: FullNodeComponents> WasmExEx<Node> {
 
     async fn handle_rpc_message(&mut self, rpc_message: RpcMessage) -> RpcResult<()> {
         match &rpc_message {
-            RpcMessage::Install(name, bytecode) => {
-                // decode base64 bytecode to module
-                let bytecode = base64::decode(bytecode).map_err(|err| {
-                    rpc_internal_error_format!("failed to decode base64 bytecode: {err}")
-                })?;
-                let module = Module::new(&self.engine, bytecode).map_err(|err| {
+            RpcMessage::Install(name, wasm_base64) => {
+                let wasm_bytescode = BASE64_STANDARD
+                    .decode(wasm_base64)
+                    .map_err(|err| rpc_internal_error_format!("failed to decode base64: {err}"))?;
+                let module = Module::new(&self.engine, wasm_bytescode).map_err(|err| {
                     rpc_internal_error_format!("failed to create module for {name}: {err}")
                 })?;
                 self.installed_exexes.insert(name.clone(), module);
