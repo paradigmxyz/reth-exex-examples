@@ -85,6 +85,10 @@ impl<Node: FullNodeComponents> WasmExEx<Node> {
     async fn handle_rpc_message(&mut self, rpc_message: RpcMessage) -> RpcResult<()> {
         match &rpc_message {
             RpcMessage::Install(name, bytecode) => {
+                // decode base64 bytecode to module
+                let bytecode = base64::decode(bytecode).map_err(|err| {
+                    rpc_internal_error_format!("failed to decode base64 bytecode: {err}")
+                })?;
                 let module = Module::new(&self.engine, bytecode).map_err(|err| {
                     rpc_internal_error_format!("failed to create module for {name}: {err}")
                 })?;
