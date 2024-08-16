@@ -23,6 +23,9 @@ reth-node-ethereum.workspace = true
 alloy = { version = "0.2", features = ["full"] }
 alloy-rlp = "0.3.4"
 
+# p2p
+libp2p = { version = "0.54.0", features = [ "gossipsub" ] }
+
 # other
 clap = "4" 
 tracing = "0.1.40"
