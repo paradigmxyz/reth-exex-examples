@@ -14,6 +14,8 @@ use reth_node_ethereum::EthereumNode;
 use superchain_registry::ROLLUP_CONFIGS;
 use tracing::{debug, error, info, warn};
 
+mod p2p;
+
 mod blobs;
 use blobs::ExExBlobProvider;
 
