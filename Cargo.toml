@@ -7,6 +7,7 @@ members = [
   "op-bridge",
   "remote",
   "rollup",
+  "daimo-names",
 ]
 resolver = "2"
 
