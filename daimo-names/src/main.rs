@@ -6,7 +6,7 @@ use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
 use reth_primitives::{address, Address, Log, SealedBlockWithSenders, TransactionSigned};
 use reth_tracing::tracing::info;
-use rusqlite::Connection;
+use tokio_postgres::{NoTls, Error, Client};
 
 sol!(DaimoNameRegistry, "daimo_name_registry_abi.json");
 use crate::DaimoNameRegistry::{Registered as RegisteredEvent, DaimoNameRegistryEvents};
@@ -18,17 +18,17 @@ const NAME_REGISTRY_ADDRESS: Address = address!("f0fc94DCDC04b2400E5EEac6Aba35cC
 /// Opens up a SQLite database and creates the tables (if they don't exist).
 async fn init<Node: FullNodeComponents>(
     ctx: ExExContext<Node>,
-    mut connection: Connection,
+    mut client: Client,
 ) -> eyre::Result<impl Future<Output = eyre::Result<()>>> {
-    create_tables(&mut connection)?;
+    create_tables(&mut client).await?;
 
-    Ok(daimo_names_exex(ctx, connection))
+    Ok(daimo_names_exex(ctx, client))
 }
 
 /// Create SQLite tables if they do not exist.
-fn create_tables(connection: &mut Connection) -> rusqlite::Result<()> {
+async fn create_tables(client: &mut Client) -> Result<(), Error> {
     // Create address <-> name mapping table
-    connection.execute(
+    client.execute(
         r#"
             CREATE TABLE IF NOT EXISTS names (
                 chain_id         INTEGER,
@@ -42,8 +42,8 @@ fn create_tables(connection: &mut Connection) -> rusqlite::Result<()> {
                 addr             TEXT NOT NULL
             );
             "#,
-        (),
-    )?;
+        &[],
+    ).await?;
 
     // todo index tx_hash for efficient revert handling
 
@@ -56,7 +56,7 @@ fn create_tables(connection: &mut Connection) -> rusqlite::Result<()> {
 /// address <-> name mappings in a SQLite database.
 async fn daimo_names_exex<Node: FullNodeComponents>(
     mut ctx: ExExContext<Node>,
-    connection: Connection,
+    client: Client,
 ) -> eyre::Result<()> {
     // Process all new chain state notifications
     while let Some(notification) = ctx.notifications.recv().await {
@@ -69,10 +69,10 @@ async fn daimo_names_exex<Node: FullNodeComponents>(
             for (_, _, tx, _, _, event) in events {
                 match event {
                     DaimoNameRegistryEvents::Registered(RegisteredEvent { .. }) => {
-                        deleted += connection.execute(
+                        deleted += client.execute(
                             "DELETE FROM names WHERE tx_hash = ?;",
-                            (tx.hash().to_string(),),
-                        )?;
+                            &[&tx.hash().to_string()],
+                        ).await?;
                     }
                     _ => continue,
                 }
@@ -91,23 +91,23 @@ async fn daimo_names_exex<Node: FullNodeComponents>(
                 match event {
                     // Registered
                     DaimoNameRegistryEvents::Registered(RegisteredEvent { name, addr}) => {
-                        let inserted = connection.execute(
+                        let inserted = client.execute(
                             r#"
                             INSERT INTO names (chain_id, block_number, block_hash, tx_index, tx_hash, log_address, log_index, name, addr)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                             "#,
-                            (
-                                tx.chain_id(),
-                                block.number,
-                                block.hash().to_string(),
-                                tx_idx,
-                                tx.hash().to_string(),
-                                log.address.to_string(),
-                                log_idx,
-                                name.to_string(),
-                                addr.to_string(),
-                            ),
-                        )?;
+                            &[
+                                &(tx.chain_id().unwrap_or_default() as i64),
+                                &(block.number as i64),
+                                &block.hash().to_string(),
+                                &(tx_idx as i64),
+                                &tx.hash().to_string(),
+                                &log.address.to_string(),
+                                &(log_idx as i64),
+                                &name.to_string(),
+                                &addr.to_string(),
+                            ],
+                        ).await?;
                         names += inserted;
                     },
                     _ => continue,
@@ -170,8 +170,10 @@ fn main() -> eyre::Result<()> {
         let handle = builder
             .node(EthereumNode::default())
             .install_exex("DaimoNames", |ctx| async move {
-                let connection = Connection::open("daimo_names.db")?;
-                init(ctx, connection).await
+                let (client, _) =
+                    tokio_postgres::connect("host=localhost user=postgres", NoTls).await?;
+
+                init(ctx, client).await
             })
             .launch()
             .await?;
@@ -193,7 +195,6 @@ mod tests {
         TxType, U256,
     };
     use reth_testing_utils::generators::sign_tx_with_random_key_pair;
-    use rusqlite::Connection;
 
     use crate::{DaimoNameRegistry, NAME_REGISTRY_ADDRESS};
 
