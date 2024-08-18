@@ -19,6 +19,16 @@ impl From<BlocksTopic> for Topic {
     }
 }
 
+impl std::fmt::Display for BlocksTopic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlocksTopic::V1(topic) => write!(f, "{}", topic),
+            BlocksTopic::V2(topic) => write!(f, "{}", topic),
+            BlocksTopic::V3(topic) => write!(f, "{}", topic),
+        }
+    }
+}
+
 /// Blocks Topics V1
 pub struct BlocksTopicV1(u64);
 

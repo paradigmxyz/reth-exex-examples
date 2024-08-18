@@ -24,7 +24,11 @@ alloy = { version = "0.2", features = ["full"] }
 alloy-rlp = "0.3.4"
 
 # p2p
-libp2p = { version = "0.54.0", features = [ "gossipsub" ] }
+snap = "1.1.1"
+discv5 = "0.6.0"
+openssl = { version = "0.10.66", features = ["vendored"] }
+libp2p-identity = { version = "0.2.9", features = [ "secp256k1" ] }
+libp2p = { version = "0.54.0", features = ["macros", "tokio", "tcp", "mplex", "noise", "gossipsub", "ping"] }
 
 # other
 clap = "4" 

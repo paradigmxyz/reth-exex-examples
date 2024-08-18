@@ -4094,6 +4094,7 @@ dependencies = [
  "kona-derive",
  "lazy_static",
  "libp2p 0.54.0",
+ "libp2p-identity",
  "parking_lot 0.12.3",
  "reqwest",
  "reth",
