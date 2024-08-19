@@ -15,15 +15,11 @@
 //!     .with_chain_id(chain_id)
 //!     .with_unsafe_block_signer(unsafe_signer)
 //!     .with_socket(socket)
-//!     .with_blocks_topic_v1()
-//!     .with_blocks_topic_v2()
-//!     .with_blocks_topic_v3()
 //!     .build()?;
 //! ```
 
 pub mod builder;
 pub mod config;
-pub mod topics;
 pub mod gossip;
 pub mod driver;
 pub mod behaviour;

@@ -1,15 +1,18 @@
 //! Block Handler
 
-
-use libp2p::gossipsub::NetworkBehaviour;
+use eyre::Result;
+use libp2p::swarm::NetworkBehaviour;
 use libp2p::gossipsub::Config;
 use libp2p::gossipsub::MessageAuthenticity;
 use libp2p::gossipsub::IdentTopic;
 
+use crate::p2p::event::Event;
+use crate::p2p::handler::Handler;
+
 /// Specifies the [NetworkBehaviour] of the node
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "Event")]
-struct Behaviour {
+pub struct Behaviour {
     /// Responds to inbound pings and send outbound pings.
     ping: libp2p::ping::Behaviour,
     /// Enables gossipsub as the routing layer.
@@ -17,7 +20,7 @@ struct Behaviour {
 }
 
 impl Behaviour {
-    /// Configures the swarm behaviors, subscribes to the gossip topics, and returns a new [Behaviour]
+    /// Configures the swarm behaviors, subscribes to the gossip topics, and returns a new [Behaviour].
     fn new(cfg: Config, handlers: &[Box<dyn Handler>]) -> Result<Self> {
         let ping = libp2p::ping::Behaviour::default();
 

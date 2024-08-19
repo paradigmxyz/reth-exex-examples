@@ -2,51 +2,36 @@
 
 use anyhow::Result;
 use std::net::SocketAddr;
-use alloy_primitives::Address;
+use alloy::primitives::Address;
 use libp2p_identity::Keypair;
 use tokio::select;
-use tokio::sync::watch::{channel, Receiver, Sender};
-use kona_derive::types::ExecutionPayload;
+use tokio::sync::watch::{Receiver, Sender};
+use kona_derive::types::L2ExecutionPayload;
+use libp2p::{Multiaddr, SwarmBuilder, PeerId, Transport};
+use libp2p::swarm::SwarmEvent;
 
+use crate::p2p::event::Event;
 use crate::p2p::behaviour::Behaviour;
 
-use libp2p::{
-    gossipsub::{self, IdentTopic, Message, MessageId},
-    mplex::MplexConfig,
-    noise, ping,
-    swarm::{NetworkBehaviour, SwarmBuilder, SwarmEvent},
-    tcp, Multiaddr, PeerId, Swarm, Transport,
-};
 
 /// Driver contains the logic for the P2P service.
 #[derive(Debug)]
 pub struct GossipDriver {
     /// The [Behaviour] of the node.
-    behaviour: Behaviour,
+    pub behaviour: Behaviour,
     /// Channel to receive unsafe blocks.
-    unsafe_block_recv: Receiver<ExecutionPayload>,
+    pub unsafe_block_recv: Receiver<L2ExecutionPayload>,
     /// Channel to send unsafe signer updates.
-    unsafe_block_signer_sender: Sender<Address>,
+    pub unsafe_block_signer_sender: Sender<Address>,
     /// The socket address that the service is listening on.
-    addr: SocketAddr,
+    pub addr: SocketAddr,
     /// The chain ID of the network.
-    chain_id: u64,
+    pub chain_id: u64,
     /// A unique keypair to validate the node's identity
-    keypair: Keypair,
+    pub keypair: Keypair,
 }
 
 impl GossipDriver {
-    /// Instantiates a new [GossipDriver].
-    pub fn new(chain_id: u64, unsafe_block_signer: Address, socket: SocketAddr) -> Self {
-        Self {
-            unsafe_block_recv,
-            unsafe_block_signer_sender,
-            addr: socket,
-            chain_id,
-            keypair: Keypair::generate_secp256k1(),
-        }
-    }
-
     /// Starts the Discv5 peer discovery & libp2p services
     /// and continually listens for new peers and messages to handle
     pub fn start(mut self) -> Result<()> {
@@ -55,11 +40,9 @@ impl GossipDriver {
         let addr = NetworkAddress::try_from(self.addr)?;
         let tcp_cfg = libp2p::tcp::Config::default();
         let auth_cfg = libp2p::noise::Config::new(&self.keypair)?;
-        let mplex_cfg = libp2p::mplex::MplexConfig::default();
         let transport = libp2p::tcp::tokio::Transport::new(tcp_cfg)
             .upgrade(libp2p::core::upgrade::Version::V1Lazy)
             .authenticate(auth_cfg)
-            .multiplex(mplex_cfg)
             .boxed();
         let mut swarm = SwarmBuilder::with_tokio_executor(transport, self.behaviour, PeerId::from(self.keypair.public()))
             .build();
@@ -82,11 +65,11 @@ impl GossipDriver {
                         }
                     },
                     event = swarm.select_next_some() => {
-                        if let SwarmEvent::Behaviour(Event::Gossipsub(gossipsub::Event::Message {
+                        if let SwarmEvent::Behaviour(Event::Gossipsub(libp2p::gossipsub::Event::Message {
                             propagation_source: peer_id,
                             message_id: id,
                             message,
-                        })) => {
+                        })) = event {
                             let handler = self.handlers
                                 .iter()
                                 .find(|h| h.topics().contains(&message.topic));

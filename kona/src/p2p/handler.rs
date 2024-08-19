@@ -1,18 +1,13 @@
 //! Block Handler
 
+use eyre::Result;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::SystemTime;
-
-use alloy_primitives::{Address, Bytes, Signature, H256, keccak256};
-
-use eyre::Result;
+use alloy::primitives::{Address, Bytes, Signature, B256, keccak256};
 use libp2p::gossipsub::{IdentTopic, Message, MessageAcceptance, TopicHash};
-use ssz_rs::{prelude::*, List, Vector, U256};
+// use ssz_rs::{prelude::*, List, Vector, U256};
 use tokio::sync::watch;
-
-use crate::{common::RawTransaction, engine::ExecutionPayload};
-
-use crate::p2p::topics::BlocksTopic;
+use kona_derive::types::{L2ExecutionPayload, L2ExecutionPayloadEnvelope, RawTransaction};
 
 /// This trait defines the functionality required to process incoming messages
 /// and determine their acceptance within the network. Implementors of this trait
@@ -30,22 +25,15 @@ pub struct BlockHandler {
     /// Chain ID of the L2 blockchain. Used to filter out gossip messages intended for other blockchains.
     chain_id: u64,
     /// A channel sender to forward new blocks to other modules
-    block_sender: Sender<ExecutionPayload>,
+    block_sender: Sender<L2ExecutionPayload>,
     /// A [watch::Receiver] to monitor changes to the unsafe block signer.
     unsafe_signer_recv: watch::Receiver<Address>,
-    /// The libp2p topic for pre Canyon/Shangai blocks: `/optimism/{chain_id}/0/blocks`
+    /// The libp2p topic for pre Canyon/Shangai blocks.
     blocks_v1_topic: IdentTopic,
-    /// The libp2p topic for Canyon/Delta blocks: `/optimism/{chain_id}/1/blocks`
+    /// The libp2p topic for Canyon/Delta blocks.
     blocks_v2_topic: IdentTopic,
+    /// The libp2p topic for Ecotone V3 blocks.
     blocks_v3_topic: IdentTopic,
-}
-
-struct ExecutionPayloadEnvelope {
-    payload: ExecutionPayload,
-    signature: Signature,
-    hash: PayloadHash,
-    #[allow(unused)]
-    parent_beacon_block_root: Option<H256>,
 }
 
 impl Handler for BlockHandler {
@@ -88,10 +76,7 @@ impl Handler for BlockHandler {
 
 impl BlockHandler {
     /// Creates a new [BlockHandler] and opens a channel
-    pub fn new(
-        topics: &[BlocksTopic],
-        unsafe_recv: watch::Receiver<Address>,
-    ) -> (Self, Receiver<ExecutionPayload>) {
+    pub fn new(chain_id: u64, unsafe_recv: watch::Receiver<Address>) -> (Self, Receiver<L2ExecutionPayload>) {
         let (sender, recv) = channel();
 
         let handler = Self {
@@ -109,7 +94,7 @@ impl BlockHandler {
     /// Determines if a block is valid.
     ///
     /// True if the block is less than 1 minute old, and correctly signed by the unsafe block signer.
-    fn block_valid(&self, envelope: &ExecutionPayloadEnvelope) -> bool {
+    fn block_valid(&self, envelope: &L2ExecutionPayloadEnvelope) -> bool {
         let current_timestamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -128,10 +113,10 @@ impl BlockHandler {
 }
 
 /// Decodes a sequence of bytes to an [ExecutionPayloadEnvelope]
-fn decode_pre_ecotone_block_msg<T>(data: Vec<u8>) -> Result<ExecutionPayloadEnvelope>
+fn decode_pre_ecotone_block_msg<T>(data: Vec<u8>) -> Result<L2ExecutionPayloadEnvelope>
 where
     T: SimpleSerialize,
-    ExecutionPayload: From<T>,
+    L2ExecutionPayload: From<T>,
 {
     let mut decoder = snap::raw::Decoder::new();
     let decompressed = decoder.decompress_vec(&data)?;
@@ -141,15 +126,11 @@ where
     let signature = Signature::try_from(sig_data)?;
 
     let payload: T = deserialize(block_data)?;
-    let payload: ExecutionPayload = ExecutionPayload::from(payload);
+    let payload = L2ExecutionPayload::from(payload);
 
-    let hash = PayloadHash::from(block_data);
-
-    Ok(ExecutionPayloadEnvelope {
+    Ok(L2ExecutionPayloadEnvelope {
         parent_beacon_block_root: None,
-        signature,
-        payload,
-        hash,
+        execution_payload: payload,
     })
 }
 
@@ -157,7 +138,7 @@ where
 /// block topic encoding includes the parent beacon block root as described in the [specs].
 ///
 /// [specs]: https://specs.optimism.io/protocol/rollup-node-p2p.html#block-encoding
-fn decode_post_ecotone_block_msg(data: Vec<u8>) -> Result<ExecutionPayloadEnvelope> {
+fn decode_post_ecotone_block_msg(data: Vec<u8>) -> Result<L2ExecutionPayloadEnvelope> {
     let mut decoder = snap::raw::Decoder::new();
     let decompressed = decoder.decompress_vec(&data)?;
     let sig_data = &decompressed[..65];
@@ -166,23 +147,21 @@ fn decode_post_ecotone_block_msg(data: Vec<u8>) -> Result<ExecutionPayloadEnvelo
 
     let signature = Signature::try_from(sig_data)?;
 
-    let parent_beacon_block_root = Some(H256::from_slice(parent_beacon_block_root));
+    let parent_beacon_block_root = Some(B256::from_slice(parent_beacon_block_root));
 
     let payload: ExecutionPayloadV3SSZ = deserialize(block_data)?;
-    let payload = ExecutionPayload::from(payload);
+    let payload = L2ExecutionPayload::from(payload);
 
     let hash = PayloadHash::from(block_data);
 
-    Ok(ExecutionPayloadEnvelope {
+    Ok(L2ExecutionPayloadEnvelope {
         parent_beacon_block_root,
-        signature,
-        payload,
-        hash,
+        execution_payload: payload,
     })
 }
 
 /// Represents the Keccak256 hash of the block
-struct PayloadHash(H256);
+struct PayloadHash(B256);
 
 impl From<&[u8]> for PayloadHash {
     /// Returns the Keccak256 hash of a sequence of bytes

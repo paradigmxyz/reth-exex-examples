@@ -1,9 +1,11 @@
 //! Event Handling.
 
+use libp2p::ping;
 use libp2p::gossipsub;
 
 /// The type of message received
-enum Event {
+#[derive(Debug)]
+pub enum Event {
     /// Represents a [ping::Event]
     #[allow(dead_code)]
     Ping(ping::Event),
