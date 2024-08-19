@@ -13,11 +13,20 @@ reth-node-ethereum.workspace = true
 reth-primitives.workspace = true
 reth-execution-types.workspace = true
 reth-tracing.workspace = true
+reth-optimism-cli.workspace = true
+reth-node-optimism.workspace = true
 
 eyre.workspace = true
 futures.workspace = true
 alloy-sol-types.workspace = true
+
 tokio-postgres = "0.7.11"
+tokio-postgres-rustls = { version = "0.10.0", default-features = false, git = "https://github.com/JamesGuthrie/tokio-postgres-rustls.git", rev = "b78dda2a9a1a23d3dbed4ecded7defbbcd831b37" }
+rustls = { version = "0.21.7", features = ["dangerous_configuration", "tls12"], default-features = false }
+deadpool-postgres = "0.14.0"
+openssl = "0.10.66"
+postgres-openssl = "0.5.0"
+clap = { version = "4.5.16", features = ["derive"] }
 
 [dev-dependencies]
 reth-exex-test-utils.workspace = true
