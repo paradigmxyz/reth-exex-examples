@@ -4,7 +4,7 @@ use std::time::Duration;
 use lazy_static::lazy_static;
 use openssl::sha::sha256;
 use snap::raw::Decoder;
-use libp2p::gossipsub::{ConfigBuilder, Config, Behaviour, Message, MessageId};
+use libp2p::gossipsub::{ConfigBuilder, Message, MessageId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 // GossipSub Constants

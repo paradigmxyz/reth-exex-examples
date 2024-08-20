@@ -18,9 +18,9 @@
 //!     .build()?;
 //! ```
 
+pub mod types;
 pub mod builder;
 pub mod config;
-pub mod gossip;
 pub mod driver;
 pub mod behaviour;
 pub mod event;

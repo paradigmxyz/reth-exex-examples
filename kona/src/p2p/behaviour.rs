@@ -21,7 +21,7 @@ pub struct Behaviour {
 
 impl Behaviour {
     /// Configures the swarm behaviors, subscribes to the gossip topics, and returns a new [Behaviour].
-    fn new(cfg: Config, handlers: &[Box<dyn Handler>]) -> Result<Self> {
+    pub fn new(cfg: Config, handlers: &[Box<dyn Handler>]) -> Result<Self> {
         let ping = libp2p::ping::Behaviour::default();
 
         let mut gossipsub =

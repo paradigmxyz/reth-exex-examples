@@ -6,21 +6,19 @@ use alloy::primitives::Address;
 use libp2p_identity::Keypair;
 use tokio::select;
 use tokio::sync::watch::{Receiver, Sender};
-use kona_derive::types::L2ExecutionPayload;
 use libp2p::{Multiaddr, SwarmBuilder, PeerId, Transport};
 use libp2p::swarm::SwarmEvent;
 
 use crate::p2p::event::Event;
 use crate::p2p::behaviour::Behaviour;
-
+use crate::p2p::types::ExecutionPayloadEnvelope;
 
 /// Driver contains the logic for the P2P service.
-#[derive(Debug)]
 pub struct GossipDriver {
     /// The [Behaviour] of the node.
     pub behaviour: Behaviour,
     /// Channel to receive unsafe blocks.
-    pub unsafe_block_recv: Receiver<L2ExecutionPayload>,
+    pub unsafe_block_recv: Receiver<ExecutionPayloadEnvelope>,
     /// Channel to send unsafe signer updates.
     pub unsafe_block_signer_sender: Sender<Address>,
     /// The socket address that the service is listening on.

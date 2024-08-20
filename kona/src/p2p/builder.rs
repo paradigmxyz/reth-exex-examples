@@ -1,19 +1,19 @@
 //! Builder for an OP Stack P2P network.
 
-use anyhow::Result;
+use eyre::Result;
 use std::net::SocketAddr;
 use alloy::primitives::Address;
+use libp2p::gossipsub::ConfigBuilder;
 use libp2p_identity::Keypair;
 use tokio::sync::watch::channel;
 
 use crate::p2p::config;
 use crate::p2p::handler::BlockHandler;
-use crate::p2p::config::ConfigBuilder;
 use crate::p2p::behaviour::Behaviour;
 use crate::p2p::driver::GossipDriver;
 
 /// Constructs a [GossipDriver] for the OP Stack P2P network.
-#[derive(Debug, Clone, Default)]
+#[derive(Default)]
 pub struct GossipDriverBuilder {
     /// The chain ID of the network.
     chain_id: Option<u64>,
@@ -69,19 +69,21 @@ impl GossipDriverBuilder {
     pub fn build(self) -> Result<GossipDriver> {
         // Build the config for gossipsub.
         let config = self.inner.unwrap_or(config::default_config_builder()).build()?;
+        let unsafe_block_signer = self.unsafe_block_signer.ok_or_else(|| eyre::eyre!("unsafe block signer not set"))?;
+        let chain_id = self.chain_id.ok_or_else(|| eyre::eyre!("chain ID not set"))?;
 
         // Create the block handler.
         let (unsafe_block_signer_sender, unsafe_block_signer_recv) = channel(unsafe_block_signer);
-        let (block_handler, unsafe_block_recv) = BlockHandler::new(&self.chain_id, unsafe_block_signer_recv);
+        let (block_handler, unsafe_block_recv) = BlockHandler::new(chain_id, unsafe_block_signer_recv);
 
         // Construct the gossipsub behaviour.
-        let behaviour = Behaviour::new(config, &block_handler)?;
+        let behaviour = Behaviour::new(config, &[Box::new(block_handler)])?;
 
         Ok(GossipDriver {
             behaviour,
             unsafe_block_recv,
             unsafe_block_signer_sender,
-            chain_id: self.chain_id.ok_or_else(|| eyre::eyre!("chain ID not set"))?,
+            chain_id,
             addr: self.socket.ok_or_else(|| eyre::eyre!("socket address not set"))?,
             keypair: self.keypair.unwrap_or(Keypair::generate_secp256k1()),
         })
