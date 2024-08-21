@@ -2,6 +2,7 @@
 members = [
   "backfill",
   "discv5",
+  "dylib",
   "in-memory-state",
   "minimal",
   "op-bridge",

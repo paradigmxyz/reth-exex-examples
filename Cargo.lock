@@ -2404,6 +2404,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "dylib"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "clap",
+ "eyre",
+ "futures",
+ "jsonrpsee",
+ "libloading",
+ "reth",
+ "reth-evm",
+ "reth-execution-types",
+ "reth-exex",
+ "reth-node-api",
+ "reth-node-ethereum",
+ "reth-tracing",
+ "serde_json",
+ "stabby",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8747,6 +8770,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha2-const-stable"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f179d4e11094a893b82fff208f74d448a7512f99f5a0acbd5c679b705f83ed9"
+
+[[package]]
 name = "sha3"
 version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8956,6 +8985,40 @@ name = "sptr"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b9b39299b249ad65f3b7e96443bad61c02ca5cd3589f46cb6d610a0fd6c0d6a"
+
+[[package]]
+name = "stabby"
+version = "36.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "311d6bcf0070c462ff626122ec2246f42bd2acd44b28908eedbfd07d500c7d99"
+dependencies = [
+ "rustversion",
+ "stabby-abi",
+]
+
+[[package]]
+name = "stabby-abi"
+version = "36.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6daae1a0707399f56d27fce7f212e50e31d215112a447e1bbcd837ae1bf5f49"
+dependencies = [
+ "rustversion",
+ "sha2-const-stable",
+ "stabby-macros",
+]
+
+[[package]]
+name = "stabby-macros"
+version = "36.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43cf89a0cc9131279235baf8599b0e073fbcb096419204de0cc5d1a48ae73f74"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "rand 0.8.5",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "stability"
