@@ -195,6 +195,8 @@ fn process_committed_chain<Node: FullNodeComponents>(
     let mut deposits = 0;
     let mut withdrawals = 0;
 
+    let connection_tx = connection.transaction()?;
+
     for (block, tx, log, event) in events {
         match event {
             // L1 -> L2 deposit
@@ -204,7 +206,7 @@ fn process_committed_chain<Node: FullNodeComponents>(
                 to,
                 ..
             }) => {
-                let inserted = connection.execute(
+                let inserted = connection_tx.execute(
                                 r#"
                                 INSERT INTO deposits (block_number, tx_hash, contract_address, "from", "to", amount)
                                 VALUES (?, ?, ?, ?, ?, ?)
@@ -227,7 +229,7 @@ fn process_committed_chain<Node: FullNodeComponents>(
                 to,
                 ..
             }) => {
-                let inserted = connection.execute(
+                let inserted = connection_tx.execute(
                                 r#"
                                 INSERT INTO withdrawals (block_number, tx_hash, contract_address, "from", "to", amount)
                                 VALUES (?, ?, ?, ?, ?, ?)
@@ -245,7 +247,18 @@ fn process_committed_chain<Node: FullNodeComponents>(
             }
             _ => continue,
         };
+
+        // Update the highest processed block in the database
+        connection_tx.execute(
+            r#"
+            INSERT OR REPLACE INTO highest_processed_block (block_number)
+            VALUES (?)
+            "#,
+            (chain.tip().number,),
+        )
     }
+
+    connection_tx.commit()?;
 
     info!(block_range = ?chain.range(), %deposits, %withdrawals, "Committed chain events");
 
