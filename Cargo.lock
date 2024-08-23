@@ -2589,28 +2589,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "example-exex-op-bridge"
-version = "0.0.0"
-dependencies = [
- "alloy-sol-types",
- "eyre",
- "futures",
- "rand 0.8.5",
- "reth",
- "reth-execution-types",
- "reth-exex",
- "reth-exex-test-utils",
- "reth-node-api",
- "reth-node-ethereum",
- "reth-primitives",
- "reth-testing-utils",
- "reth-tracing",
- "rusqlite",
- "tempfile",
- "tokio",
-]
-
-[[package]]
 name = "eyre"
 version = "0.6.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4726,6 +4704,28 @@ dependencies = [
  "op-alloy-consensus",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "op-bridge"
+version = "0.0.0"
+dependencies = [
+ "alloy-sol-types",
+ "eyre",
+ "futures",
+ "rand 0.8.5",
+ "reth",
+ "reth-execution-types",
+ "reth-exex",
+ "reth-exex-test-utils",
+ "reth-node-api",
+ "reth-node-ethereum",
+ "reth-primitives",
+ "reth-testing-utils",
+ "reth-tracing",
+ "rusqlite",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]

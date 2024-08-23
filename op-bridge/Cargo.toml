@@ -1,5 +1,5 @@
 [package]
-name = "example-exex-op-bridge"
+name = "op-bridge"
 version = "0.0.0"
 publish = false
 edition.workspace = true

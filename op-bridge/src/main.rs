@@ -1,8 +1,8 @@
-use std::{ops::Deref, sync::Arc};
+use std::{ops::DerefMut, sync::Arc};
 
 use alloy_sol_types::{sol, SolEventInterface};
 use eyre::OptionExt;
-use futures::{Future, StreamExt, TryStreamExt};
+use futures::{Future, FutureExt, TryStreamExt};
 use reth_execution_types::Chain;
 use reth_exex::{BackfillJobFactory, ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
@@ -41,6 +41,8 @@ async fn init<Node: FullNodeComponents>(
         .transpose()?
         .unwrap_or(0);
 
+    let connection = Arc::new(Mutex::new(connection));
+
     // If head block is ahead of the highest processed block in the database, backfill the missing
     // range of blocks
     if ctx.head.number > highest_processed_block {
@@ -50,15 +52,22 @@ async fn init<Node: FullNodeComponents>(
             // Convert the backfill job into a parallel stream
             .into_stream()
             // Convert the block execution error into `eyre`
-            .map_err(Into::into)
+            .map_err(eyre::Error::from)
             // Process each block, returning early if an error occurs
             .try_for_each(|chain| {
+                let ctx = &ctx;
                 let connection = connection.clone();
-                process_committed_chain(&ctx, &connection, &chain)?;
-                futures::ready(Ok(()))
+                async move {
+                    let connection = connection.lock().await;
+                    process_committed_chain(ctx, connection, &chain)?;
+                    Ok(())
+                }
             })
             .await?;
     }
+
+    let connection =
+        Arc::into_inner(connection).expect("Arced connection has no references").into_inner();
 
     Ok(op_bridge_exex(ctx, connection))
 }
@@ -140,7 +149,7 @@ fn create_tables(connection: &Connection) -> rusqlite::Result<()> {
 /// and stores deposits and withdrawals in a SQLite database.
 async fn op_bridge_exex<Node: FullNodeComponents>(
     mut ctx: ExExContext<Node>,
-    connection: Connection,
+    mut connection: Connection,
 ) -> eyre::Result<()> {
     // Process all new chain state notifications
     while let Some(notification) = ctx.notifications.recv().await {
@@ -178,7 +187,7 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
 
         // Insert all new deposits and withdrawals
         if let Some(committed_chain) = notification.committed_chain() {
-            process_committed_chain(&ctx, &connection, &committed_chain)?;
+            process_committed_chain(&ctx, &mut connection, &committed_chain)?;
         }
     }
 
@@ -187,7 +196,7 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
 
 fn process_committed_chain<Node: FullNodeComponents>(
     ctx: &ExExContext<Node>,
-    connection: &Connection,
+    mut connection: impl DerefMut<Target = Connection>,
     chain: &Chain,
 ) -> eyre::Result<()> {
     let events = decode_chain_into_events(chain);
@@ -255,7 +264,7 @@ fn process_committed_chain<Node: FullNodeComponents>(
             VALUES (?)
             "#,
             (chain.tip().number,),
-        )
+        )?;
     }
 
     connection_tx.commit()?;
@@ -306,9 +315,23 @@ fn main() -> eyre::Result<()> {
     reth::cli::Cli::parse_args().run(|builder, _| async move {
         let handle = builder
             .node(EthereumNode::default())
-            .install_exex("OPBridge", |ctx| async move {
-                let connection = Connection::open("op_bridge.db")?;
-                init(ctx, connection).await
+            .install_exex("OPBridge", move |ctx| {
+                // Rust seems to trigger a bogus higher-ranked lifetime error when using
+                // just an async closure here -- using `spawn_blocking` avoids this
+                // particular issue.
+                //
+                // To avoid the higher ranked lifetime error we use `spawn_blocking`
+                // which will move the closure to another blocking-allowed thread,
+                // then execute.
+                //
+                // Source: https://github.com/vados-cosmonic/wasmCloud/commit/440e8c377f6b02f45eacb02692e4d2fabd53a0ec
+                tokio::task::spawn_blocking(move || {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        let connection = Connection::open("op_bridge.db")?;
+                        init(ctx, connection).await
+                    })
+                })
+                .map(|result| result.map_err(Into::into).and_then(|result| result))
             })
             .launch()
             .await?;
