@@ -1,7 +1,6 @@
 use std::{ops::DerefMut, sync::Arc};
 
 use alloy_sol_types::{sol, SolEventInterface};
-use eyre::OptionExt;
 use futures::{Future, FutureExt, TryStreamExt};
 use reth_execution_types::Chain;
 use reth_exex::{BackfillJobFactory, ExExContext, ExExEvent};
@@ -160,11 +159,13 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
             let mut deposits = 0;
             let mut withdrawals = 0;
 
+            let connection_tx = connection.transaction()?;
+
             for (_, tx, _, event) in events {
                 match event {
                     // L1 -> L2 deposit
                     L1StandardBridgeEvents::ETHBridgeInitiated(ETHBridgeInitiated { .. }) => {
-                        let deleted = connection.execute(
+                        let deleted = connection_tx.execute(
                             "DELETE FROM deposits WHERE tx_hash = ?;",
                             (tx.hash().to_string(),),
                         )?;
@@ -172,7 +173,7 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
                     }
                     // L2 -> L1 withdrawal
                     L1StandardBridgeEvents::ETHBridgeFinalized(ETHBridgeFinalized { .. }) => {
-                        let deleted = connection.execute(
+                        let deleted = connection_tx.execute(
                             "DELETE FROM withdrawals WHERE tx_hash = ?;",
                             (tx.hash().to_string(),),
                         )?;
@@ -181,6 +182,17 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
                     _ => continue,
                 }
             }
+
+            // Update the highest processed block in the database
+            connection_tx.execute(
+                r#"
+                    INSERT OR REPLACE INTO highest_processed_block (block_number)
+                    VALUES (?)
+                    "#,
+                (reverted_chain.first().number.saturating_sub(1),),
+            )?;
+
+            connection_tx.commit()?;
 
             info!(block_range = ?reverted_chain.range(), %deposits, %withdrawals, "Reverted chain events");
         }
