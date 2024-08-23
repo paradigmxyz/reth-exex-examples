@@ -6,23 +6,23 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-reth.workspace = true
+reth-execution-types.workspace = true
 reth-exex.workspace = true
 reth-node-api.workspace = true
 reth-node-ethereum.workspace = true
 reth-primitives.workspace = true
-reth-execution-types.workspace = true
 reth-tracing.workspace = true
+reth.workspace = true
 
+alloy-sol-types.workspace = true
 eyre.workspace = true
 futures.workspace = true
-alloy-sol-types.workspace = true
-rusqlite = { version = "0.31.0", features = ["bundled"] }
+rusqlite = { version = "0.32.0", features = ["bundled"] }
+tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
 reth-exex-test-utils.workspace = true
 reth-testing-utils.workspace = true
 
-tokio.workspace = true
 rand = "0.8"
 tempfile = "3"

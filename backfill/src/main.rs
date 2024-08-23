@@ -221,7 +221,7 @@ async fn backfill_with_job<
     job
         // Convert the backfill job into a parallel stream
         .into_stream()
-        // Covert the block execution error into `eyre`
+        // Convert the block execution error into `eyre`
         .map_err(Into::into)
         // Process each block, returning early if an error occurs
         .try_for_each(|chain| async move { process_committed_chain(&chain) })

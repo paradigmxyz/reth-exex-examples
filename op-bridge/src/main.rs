@@ -1,12 +1,16 @@
+use std::{ops::Deref, sync::Arc};
+
 use alloy_sol_types::{sol, SolEventInterface};
-use futures::Future;
+use eyre::OptionExt;
+use futures::{Future, StreamExt, TryStreamExt};
 use reth_execution_types::Chain;
-use reth_exex::{ExExContext, ExExEvent};
+use reth_exex::{BackfillJobFactory, ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
 use reth_primitives::{address, Address, Log, SealedBlockWithSenders, TransactionSigned};
 use reth_tracing::tracing::info;
 use rusqlite::Connection;
+use tokio::sync::Mutex;
 
 sol!(L1StandardBridge, "l1_standard_bridge_abi.json");
 use crate::L1StandardBridge::{ETHBridgeFinalized, ETHBridgeInitiated, L1StandardBridgeEvents};
@@ -25,15 +29,52 @@ const OP_BRIDGES: [Address; 6] = [
 /// Opens up a SQLite database and creates the tables (if they don't exist).
 async fn init<Node: FullNodeComponents>(
     ctx: ExExContext<Node>,
-    mut connection: Connection,
+    connection: Connection,
 ) -> eyre::Result<impl Future<Output = eyre::Result<()>>> {
-    create_tables(&mut connection)?;
+    create_tables(&connection)?;
+
+    // Query the highest processed block from the database
+    let highest_processed_block = connection
+        .prepare(r#"SELECT block_number FROM highest_processed_block"#)?
+        .query_map([], |row| row.get(0))?
+        .next()
+        .transpose()?
+        .unwrap_or(0);
+
+    // If head block is ahead of the highest processed block in the database, backfill the missing
+    // range of blocks
+    if ctx.head.number > highest_processed_block {
+        BackfillJobFactory::new(ctx.block_executor().clone(), ctx.provider().clone())
+            // Create a backfill job for the missing range
+            .backfill(ctx.head.number..=highest_processed_block)
+            // Convert the backfill job into a parallel stream
+            .into_stream()
+            // Convert the block execution error into `eyre`
+            .map_err(Into::into)
+            // Process each block, returning early if an error occurs
+            .try_for_each(|chain| {
+                let connection = connection.clone();
+                process_committed_chain(&ctx, &connection, &chain)?;
+                futures::ready(Ok(()))
+            })
+            .await?;
+    }
 
     Ok(op_bridge_exex(ctx, connection))
 }
 
 /// Create SQLite tables if they do not exist.
-fn create_tables(connection: &mut Connection) -> rusqlite::Result<()> {
+fn create_tables(connection: &Connection) -> rusqlite::Result<()> {
+    // Create highest processed block table
+    connection.execute(
+        r#"
+            CREATE TABLE IF NOT EXISTS highest_processed_block (
+                block_number INTEGER NOT NULL
+            );
+            "#,
+        (),
+    )?;
+
     // Create deposits and withdrawals tables
     connection.execute(
         r#"
@@ -137,21 +178,33 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
 
         // Insert all new deposits and withdrawals
         if let Some(committed_chain) = notification.committed_chain() {
-            let events = decode_chain_into_events(&committed_chain);
+            process_committed_chain(&ctx, &connection, &committed_chain)?;
+        }
+    }
 
-            let mut deposits = 0;
-            let mut withdrawals = 0;
+    Ok(())
+}
 
-            for (block, tx, log, event) in events {
-                match event {
-                    // L1 -> L2 deposit
-                    L1StandardBridgeEvents::ETHBridgeInitiated(ETHBridgeInitiated {
-                        amount,
-                        from,
-                        to,
-                        ..
-                    }) => {
-                        let inserted = connection.execute(
+fn process_committed_chain<Node: FullNodeComponents>(
+    ctx: &ExExContext<Node>,
+    connection: &Connection,
+    chain: &Chain,
+) -> eyre::Result<()> {
+    let events = decode_chain_into_events(chain);
+
+    let mut deposits = 0;
+    let mut withdrawals = 0;
+
+    for (block, tx, log, event) in events {
+        match event {
+            // L1 -> L2 deposit
+            L1StandardBridgeEvents::ETHBridgeInitiated(ETHBridgeInitiated {
+                amount,
+                from,
+                to,
+                ..
+            }) => {
+                let inserted = connection.execute(
                                 r#"
                                 INSERT INTO deposits (block_number, tx_hash, contract_address, "from", "to", amount)
                                 VALUES (?, ?, ?, ?, ?, ?)
@@ -165,16 +218,16 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
                                     amount.to_string(),
                                 ),
                             )?;
-                        deposits += inserted;
-                    }
-                    // L2 -> L1 withdrawal
-                    L1StandardBridgeEvents::ETHBridgeFinalized(ETHBridgeFinalized {
-                        amount,
-                        from,
-                        to,
-                        ..
-                    }) => {
-                        let inserted = connection.execute(
+                deposits += inserted;
+            }
+            // L2 -> L1 withdrawal
+            L1StandardBridgeEvents::ETHBridgeFinalized(ETHBridgeFinalized {
+                amount,
+                from,
+                to,
+                ..
+            }) => {
+                let inserted = connection.execute(
                                 r#"
                                 INSERT INTO withdrawals (block_number, tx_hash, contract_address, "from", "to", amount)
                                 VALUES (?, ?, ?, ?, ?, ?)
@@ -188,19 +241,17 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
                                     amount.to_string(),
                                 ),
                             )?;
-                        withdrawals += inserted;
-                    }
-                    _ => continue,
-                };
+                withdrawals += inserted;
             }
-
-            info!(block_range = ?committed_chain.range(), %deposits, %withdrawals, "Committed chain events");
-
-            // Send a finished height event, signaling the node that we don't need any blocks below
-            // this height anymore
-            ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
-        }
+            _ => continue,
+        };
     }
+
+    info!(block_range = ?chain.range(), %deposits, %withdrawals, "Committed chain events");
+
+    // Send a finished height event, signaling the node that we don't need any blocks below
+    // this height anymore
+    ctx.events.send(ExExEvent::FinishedHeight(chain.tip().number))?;
 
     Ok(())
 }
