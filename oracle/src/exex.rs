@@ -1,24 +1,21 @@
 use eyre::Result;
-use futures::{Future, FutureExt};
+use futures::Future;
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
-use reth_tracing::tracing::{error, info};
+use reth_tracing::tracing::info;
 use std::{
     pin::Pin,
     task::{ready, Context, Poll},
 };
 
-use crate::disc::Discovery;
-
 /// The ExEx struct, representing the initialization and execution of the ExEx.
 pub struct ExEx<Node: FullNodeComponents> {
     exex: ExExContext<Node>,
-    disc: Discovery,
 }
 
 impl<Node: FullNodeComponents> ExEx<Node> {
-    pub fn new(exex: ExExContext<Node>, disc: Discovery) -> Self {
-        Self { exex, disc }
+    pub fn new(exex: ExExContext<Node>) -> Self {
+        Self { exex }
     }
 }
 
@@ -26,23 +23,6 @@ impl<Node: FullNodeComponents> Future for ExEx<Node> {
     type Output = Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // Poll the Discv5 future until its drained
-        loop {
-            match self.disc.poll_unpin(cx) {
-                Poll::Ready(Ok(())) => {
-                    info!("Discv5 task completed successfully");
-                }
-                Poll::Ready(Err(e)) => {
-                    error!(?e, "Discv5 task encountered an error");
-                    return Poll::Ready(Err(e));
-                }
-                Poll::Pending => {
-                    // Exit match and continue to poll notifications
-                    break;
-                }
-            }
-        }
-
         // Continuously poll the ExExContext notifications
         loop {
             if let Some(notification) = ready!(self.exex.notifications.poll_recv(cx)) {

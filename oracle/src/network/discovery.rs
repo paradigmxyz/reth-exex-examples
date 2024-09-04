@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use discv5::{enr::secp256k1::rand, Enr, Event, ListenConfig};
 use reth::network::config::SecretKey;
 use reth_discv5::{enr::EnrCombinedKeyWrapper, Config, Discv5};
@@ -7,7 +5,7 @@ use reth_network_peers::NodeRecord;
 use reth_tracing::tracing::info;
 use std::{
     future::Future,
-    net::SocketAddr,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,
     task::{ready, Context, Poll},
 };
@@ -24,16 +22,16 @@ pub(crate) struct Discovery {
 }
 
 impl Discovery {
-    /// Starts a new discv5 node.
-    pub async fn new(udp_port: u16, tcp_port: u16) -> eyre::Result<Discovery> {
+    /// Starts a new discovery node.
+    pub(crate) async fn new(udp_port: u16, tcp_port: u16) -> eyre::Result<Discovery> {
         let secret_key = SecretKey::new(&mut rand::thread_rng());
 
-        let discv5_addr: SocketAddr = format!("127.0.0.1:{udp_port}").parse()?;
-        let rlpx_addr: SocketAddr = format!("127.0.0.1:{tcp_port}").parse()?;
+        let disc_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), udp_port);
+        let rlpx_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), tcp_port);
 
-        let discv5_listen_config = ListenConfig::from(discv5_addr);
+        let config = ListenConfig::from(disc_addr);
         let discv5_config = Config::builder(rlpx_addr)
-            .discv5_config(discv5::ConfigBuilder::new(discv5_listen_config).build())
+            .discv5_config(discv5::ConfigBuilder::new(config).build())
             .build();
 
         let (discv5, events, node_record) = Discv5::start(&secret_key, discv5_config).await?;
@@ -41,15 +39,20 @@ impl Discovery {
     }
 
     /// Adds a node to the table if its not already present.
-    pub fn add_node(&mut self, enr: Enr) -> eyre::Result<()> {
+    pub(crate) fn add_node(&mut self, enr: Enr) -> eyre::Result<()> {
         let reth_enr: enr::Enr<SecretKey> = EnrCombinedKeyWrapper(enr.clone()).into();
         self.inner.add_node(reth_enr)?;
         Ok(())
     }
 
     /// Returns the local ENR of the discv5 node.
-    pub fn local_enr(&self) -> Enr {
+    pub(crate) fn local_enr(&self) -> Enr {
         self.inner.with_discv5(|discv5| discv5.local_enr())
+    }
+
+    /// Returns true if the discv5 node has connected peers.
+    pub(crate) fn has_peers(&self) -> bool {
+        self.inner.with_discv5(|discv5| discv5.connected_peers() > 0)
     }
 }
 
@@ -60,11 +63,18 @@ impl Future for Discovery {
         let mut this = self.as_mut();
         loop {
             match ready!(this.events.poll_recv(cx)) {
-                Some(evt) => {
-                    if let Event::SessionEstablished(enr, socket_addr) = evt {
+                Some(evt) => match evt {
+                    Event::Discovered(enr) => {
+                        info!(?enr, "Discovered a new peer.");
+                        this.add_node(enr)?;
+                    }
+                    Event::SessionEstablished(enr, socket_addr) => {
                         info!(?enr, ?socket_addr, "Session established with a new peer.");
                     }
-                }
+                    evt => {
+                        info!(?evt, "New discovery event.");
+                    }
+                },
                 None => return Poll::Ready(Ok(())),
             }
         }
@@ -73,9 +83,8 @@ impl Future for Discovery {
 
 #[cfg(test)]
 mod tests {
+    use crate::network::discovery::Discovery;
     use reth_tracing::tracing::info;
-
-    use crate::disc::Discovery;
 
     #[tokio::test]
     async fn can_establish_discv5_session_with_peer() {

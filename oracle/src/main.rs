@@ -1,12 +1,16 @@
 use clap::Parser;
 use cli_ext::OracleExt;
-use disc::Discovery;
 use exex::ExEx;
+use network::Network;
+use oracle::Oracle;
 use reth_node_ethereum::EthereumNode;
 
 mod cli_ext;
-mod disc;
 mod exex;
+mod network;
+mod oracle;
+
+const ORACLE_EXEX_ID: &str = "exex-oracle";
 
 fn main() -> eyre::Result<()> {
     reth::cli::Cli::<OracleExt>::parse().run(|builder, args| async move {
@@ -15,12 +19,11 @@ fn main() -> eyre::Result<()> {
 
         let handle = builder
             .node(EthereumNode::default())
-            .install_exex("exex-oracle", move |ctx| async move {
-                // start Discv5 task
-                let disc = Discovery::new(tcp_port, udp_port).await?;
-
-                // start exex task with discv5
-                Ok(ExEx::new(ctx, disc))
+            .install_exex(ORACLE_EXEX_ID, move |ctx| async move {
+                let exex = ExEx::new(ctx);
+                let network = Network::new(tcp_port, udp_port).await?;
+                let oracle = Oracle::new(exex, network).await?;
+                Ok(oracle)
             })
             .launch()
             .await?;
