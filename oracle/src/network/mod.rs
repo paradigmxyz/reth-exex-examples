@@ -1,3 +1,4 @@
+use discovery::Discovery;
 use futures::FutureExt;
 use reth_tracing::tracing::{error, info};
 use std::{
@@ -7,17 +8,18 @@ use std::{
 };
 
 mod discovery;
+pub(crate) mod proto;
 
 /// The Network struct is a long running task that orchestrates discovery of new peers and network
 /// gossiping via the RLPx subprotocol.
 pub(crate) struct Network {
     /// The discovery task for this node.
-    discovery: discovery::Discovery,
+    discovery: Discovery,
 }
 
 impl Network {
     pub(crate) async fn new(tcp_port: u16, udp_port: u16) -> eyre::Result<Self> {
-        let discovery = discovery::Discovery::new(tcp_port, udp_port).await?;
+        let discovery = Discovery::new(tcp_port, udp_port).await?;
         Ok(Self { discovery })
     }
 }
@@ -31,10 +33,10 @@ impl Future for Network {
         loop {
             match this.discovery.poll_unpin(cx) {
                 Poll::Ready(Ok(())) => {
-                    info!("Discv5 task completed successfully");
+                    info!("Discovery task completed");
                 }
                 Poll::Ready(Err(e)) => {
-                    error!(?e, "Discv5 task encountered an error");
+                    error!(?e, "Discovery task encountered an error");
                     return Poll::Ready(Err(e));
                 }
                 Poll::Pending => {}

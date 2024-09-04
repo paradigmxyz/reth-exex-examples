@@ -1,8 +1,9 @@
 use clap::Parser;
 use cli_ext::OracleExt;
 use exex::ExEx;
-use network::Network;
+use network::{proto::OracleProtoHandler, Network};
 use oracle::Oracle;
+use reth_network::{protocol::IntoRlpxSubProtocol, NetworkProtocols};
 use reth_node_ethereum::EthereumNode;
 
 mod cli_ext;
@@ -20,6 +21,9 @@ fn main() -> eyre::Result<()> {
         let handle = builder
             .node(EthereumNode::default())
             .install_exex(ORACLE_EXEX_ID, move |ctx| async move {
+                let subproto = OracleProtoHandler::new();
+                ctx.network().add_rlpx_sub_protocol(subproto.into_rlpx_sub_protocol());
+
                 let exex = ExEx::new(ctx);
                 let network = Network::new(tcp_port, udp_port).await?;
                 let oracle = Oracle::new(exex, network).await?;
