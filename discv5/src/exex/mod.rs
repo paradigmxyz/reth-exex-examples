@@ -1,5 +1,5 @@
 use eyre::Result;
-use futures::{Future, FutureExt};
+use futures::{Future, FutureExt, StreamExt};
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
 use reth_tracing::tracing::{error, info};
@@ -45,7 +45,7 @@ impl<Node: FullNodeComponents> Future for ExEx<Node> {
 
         // Continuously poll the ExExContext notifications
         loop {
-            if let Some(notification) = ready!(self.exex.notifications.poll_recv(cx)) {
+            if let Some(notification) = ready!(self.exex.notifications.poll_next_unpin(cx)) {
                 match &notification {
                     ExExNotification::ChainCommitted { new } => {
                         info!(committed_chain = ?new.range(), "Received commit");
