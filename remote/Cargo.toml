@@ -28,7 +28,7 @@ reth-exex-test-utils.workspace = true
 
 [features]
 default = []
-optimism = ["reth/optimism"]
+optimism = []
 
 [[bin]]
 name = "remote-exex"

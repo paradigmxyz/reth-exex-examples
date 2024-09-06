@@ -19,23 +19,23 @@ publish = false
 
 [workspace.dependencies]
 # reth
-reth = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-chainspec = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-discv5 = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-execution-errors = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-execution-types = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-exex = { git = "https://github.com/paradigmxyz/reth", features = ["serde"], version = "1.0.4" }
-reth-network-peers = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-node-api = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-primitives = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-provider = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-revm = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-evm = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
-reth-tracing = { git = "https://github.com/paradigmxyz/reth", version = "1.0.4" }
+reth = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-chainspec = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-discv5 = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-execution-errors = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-execution-types = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-exex = { git = "https://github.com/paradigmxyz/reth", features = ["serde"], branch = "alexey/exexcontext-notifications-subscribe" }
+reth-network-peers = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-node-api = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-provider = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-evm = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
+reth-tracing = { git = "https://github.com/paradigmxyz/reth", branch = "alexey/exexcontext-notifications-subscribe" }
 
 # alloy
-alloy-sol-types = { version = "0.7", features = ["json"] }
+alloy-sol-types = { version = "0.8", features = ["json"] }
 
 # async
 futures = "0.3"
