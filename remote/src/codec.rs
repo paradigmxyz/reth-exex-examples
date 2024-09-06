@@ -266,10 +266,6 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
                     .collect(),
                 input: input.to_vec(),
             }),
-            #[cfg(feature = "optimism")]
-            reth::primitives::Transaction::Deposit(_) => {
-                eyre::bail!("deposit transaction not supported")
-            }
         };
 
         Ok(proto::Transaction { hash, signature: Some(signature), transaction: Some(transaction) })
@@ -463,10 +459,6 @@ impl TryFrom<&reth::primitives::Receipt> for proto::NonEmptyReceipt {
                 reth::primitives::TxType::Eip1559 => proto::TxType::Eip1559,
                 reth::primitives::TxType::Eip4844 => proto::TxType::Eip4844,
                 reth::primitives::TxType::Eip7702 => proto::TxType::Eip7702,
-                #[cfg(feature = "optimism")]
-                reth::primitives::TxType::Deposit => {
-                    eyre::bail!("deposit transaction not supported")
-                }
             } as i32,
             success: receipt.success,
             cumulative_gas_used: receipt.cumulative_gas_used,
@@ -814,7 +806,7 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
                             chain_id: U256::try_from_le_slice(authorization.chain_id.as_slice())
                                 .ok_or_eyre("failed to parse chain id")?,
                             address: Address::try_from(authorization.address.as_slice())?,
-                            nonce: authorization.nonce.into(),
+                            nonce: authorization.nonce,
                         }
                         .into_signed(signature))
                     })

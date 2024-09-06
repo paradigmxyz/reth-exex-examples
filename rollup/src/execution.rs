@@ -280,8 +280,7 @@ mod tests {
     use secp256k1::{Keypair, Secp256k1};
 
     use crate::{
-        db::Database, execute_block, RollupContract::BlockHeader, CHAIN_ID,
-        ROLLUP_SUBMITTER_ADDRESS,
+        db::Database, execute_block, Zenith::BlockHeader, CHAIN_ID, ROLLUP_SUBMITTER_ADDRESS,
     };
 
     sol!(
