@@ -14,6 +14,7 @@ reth-tracing.workspace = true
 reth-execution-types.workspace = true
 
 eyre.workspace = true
+futures-util.workspace = true
 
 [dev-dependencies]
 reth-exex-test-utils.workspace = true

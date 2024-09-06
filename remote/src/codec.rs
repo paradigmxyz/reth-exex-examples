@@ -156,7 +156,7 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
                 chain_id: *chain_id,
                 nonce: *nonce,
                 gas_price: gas_price.to_le_bytes().to_vec(),
-                gas_limit: *gas_limit,
+                gas_limit: gas_limit.to_le_bytes().to_vec(),
                 to: Some(to.into()),
                 value: value.to_le_bytes_vec(),
                 input: input.to_vec(),
@@ -174,7 +174,7 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
                 chain_id: *chain_id,
                 nonce: *nonce,
                 gas_price: gas_price.to_le_bytes().to_vec(),
-                gas_limit: *gas_limit,
+                gas_limit: gas_limit.to_le_bytes().to_vec(),
                 to: Some(to.into()),
                 value: value.to_le_bytes_vec(),
                 access_list: access_list.iter().map(Into::into).collect(),
@@ -193,7 +193,7 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
             }) => proto::transaction::Transaction::Eip1559(proto::TransactionEip1559 {
                 chain_id: *chain_id,
                 nonce: *nonce,
-                gas_limit: *gas_limit,
+                gas_limit: gas_limit.to_le_bytes().to_vec(),
                 max_fee_per_gas: max_fee_per_gas.to_le_bytes().to_vec(),
                 max_priority_fee_per_gas: max_priority_fee_per_gas.to_le_bytes().to_vec(),
                 to: Some(to.into()),
@@ -207,7 +207,6 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
                 gas_limit,
                 max_fee_per_gas,
                 max_priority_fee_per_gas,
-                placeholder: _,
                 to,
                 value,
                 access_list,
@@ -217,7 +216,7 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
             }) => proto::transaction::Transaction::Eip4844(proto::TransactionEip4844 {
                 chain_id: *chain_id,
                 nonce: *nonce,
-                gas_limit: *gas_limit,
+                gas_limit: gas_limit.to_le_bytes().to_vec(),
                 max_fee_per_gas: max_fee_per_gas.to_le_bytes().to_vec(),
                 max_priority_fee_per_gas: max_priority_fee_per_gas.to_le_bytes().to_vec(),
                 to: to.to_vec(),
@@ -244,7 +243,7 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
             }) => proto::transaction::Transaction::Eip7702(proto::TransactionEip7702 {
                 chain_id: *chain_id,
                 nonce: *nonce,
-                gas_limit: *gas_limit,
+                gas_limit: gas_limit.to_le_bytes().to_vec(),
                 max_fee_per_gas: max_fee_per_gas.to_le_bytes().to_vec(),
                 max_priority_fee_per_gas: max_priority_fee_per_gas.to_le_bytes().to_vec(),
                 to: Some(to.into()),
@@ -254,7 +253,7 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
                     .iter()
                     .map(|authorization| proto::AuthorizationListItem {
                         authorization: Some(proto::Authorization {
-                            chain_id: authorization.chain_id(),
+                            chain_id: authorization.chain_id().to_le_bytes_vec(),
                             address: authorization.address().to_vec(),
                             nonce: authorization.nonce(),
                         }),
@@ -267,10 +266,6 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
                     .collect(),
                 input: input.to_vec(),
             }),
-            #[cfg(feature = "optimism")]
-            reth::primitives::Transaction::Deposit(_) => {
-                eyre::bail!("deposit transaction not supported")
-            }
         };
 
         Ok(proto::Transaction { hash, signature: Some(signature), transaction: Some(transaction) })
@@ -359,6 +354,13 @@ impl TryFrom<&reth::revm::primitives::Bytecode> for proto::Bytecode {
             }
             reth::revm::primitives::Bytecode::Eof(_) => {
                 eyre::bail!("EOF bytecode not supported");
+            }
+            reth::revm::primitives::Bytecode::Eip7702(eip7702) => {
+                proto::bytecode::Bytecode::Eip7702(proto::Eip7702Bytecode {
+                    delegated_address: eip7702.delegated_address.to_vec(),
+                    version: eip7702.version as u64,
+                    raw: eip7702.raw.to_vec(),
+                })
             }
         };
         Ok(proto::Bytecode { bytecode: Some(bytecode) })
@@ -457,10 +459,6 @@ impl TryFrom<&reth::primitives::Receipt> for proto::NonEmptyReceipt {
                 reth::primitives::TxType::Eip1559 => proto::TxType::Eip1559,
                 reth::primitives::TxType::Eip4844 => proto::TxType::Eip4844,
                 reth::primitives::TxType::Eip7702 => proto::TxType::Eip7702,
-                #[cfg(feature = "optimism")]
-                reth::primitives::TxType::Deposit => {
-                    eyre::bail!("deposit transaction not supported")
-                }
             } as i32,
             success: receipt.success,
             cumulative_gas_used: receipt.cumulative_gas_used,
@@ -666,7 +664,7 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
                 chain_id: *chain_id,
                 nonce: *nonce,
                 gas_price: u128::from_le_bytes(gas_price.as_slice().try_into()?),
-                gas_limit: *gas_limit,
+                gas_limit: u128::from_le_bytes(gas_limit.as_slice().try_into()?),
                 to: to.as_ref().ok_or_eyre("no to")?.try_into()?,
                 value: U256::try_from_le_slice(value.as_slice())
                     .ok_or_eyre("failed to parse value")?,
@@ -685,7 +683,7 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
                 chain_id: *chain_id,
                 nonce: *nonce,
                 gas_price: u128::from_le_bytes(gas_price.as_slice().try_into()?),
-                gas_limit: *gas_limit,
+                gas_limit: u128::from_le_bytes(gas_limit.as_slice().try_into()?),
                 to: to.as_ref().ok_or_eyre("no to")?.try_into()?,
                 value: U256::try_from_le_slice(value.as_slice())
                     .ok_or_eyre("failed to parse value")?,
@@ -709,7 +707,7 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
             }) => reth::primitives::Transaction::Eip1559(reth::primitives::TxEip1559 {
                 chain_id: *chain_id,
                 nonce: *nonce,
-                gas_limit: *gas_limit,
+                gas_limit: u128::from_le_bytes(gas_limit.as_slice().try_into()?),
                 max_fee_per_gas: u128::from_le_bytes(max_fee_per_gas.as_slice().try_into()?),
                 max_priority_fee_per_gas: u128::from_le_bytes(
                     max_priority_fee_per_gas.as_slice().try_into()?,
@@ -739,12 +737,11 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
             }) => reth::primitives::Transaction::Eip4844(reth::primitives::TxEip4844 {
                 chain_id: *chain_id,
                 nonce: *nonce,
-                gas_limit: *gas_limit,
+                gas_limit: u128::from_le_bytes(gas_limit.as_slice().try_into()?),
                 max_fee_per_gas: u128::from_le_bytes(max_fee_per_gas.as_slice().try_into()?),
                 max_priority_fee_per_gas: u128::from_le_bytes(
                     max_priority_fee_per_gas.as_slice().try_into()?,
                 ),
-                placeholder: None,
                 to: Address::try_from(to.as_slice())?,
                 value: U256::try_from_le_slice(value.as_slice())
                     .ok_or_eyre("failed to parse value")?,
@@ -776,7 +773,7 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
             }) => reth::primitives::Transaction::Eip7702(reth::primitives::TxEip7702 {
                 chain_id: *chain_id,
                 nonce: *nonce,
-                gas_limit: *gas_limit,
+                gas_limit: u128::from_le_bytes(gas_limit.as_slice().try_into()?),
                 max_fee_per_gas: u128::from_le_bytes(max_fee_per_gas.as_slice().try_into()?),
                 max_priority_fee_per_gas: u128::from_le_bytes(
                     max_priority_fee_per_gas.as_slice().try_into()?,
@@ -806,9 +803,10 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
                         let authorization =
                             authorization.authorization.as_ref().ok_or_eyre("no authorization")?;
                         Ok(reth::primitives::eip7702::Authorization {
-                            chain_id: authorization.chain_id,
+                            chain_id: U256::try_from_le_slice(authorization.chain_id.as_slice())
+                                .ok_or_eyre("failed to parse chain id")?,
                             address: Address::try_from(authorization.address.as_slice())?,
-                            nonce: authorization.nonce.into(),
+                            nonce: authorization.nonce,
                         }
                         .into_signed(signature))
                     })
@@ -886,6 +884,16 @@ impl TryFrom<&proto::Bytecode> for reth::revm::primitives::Bytecode {
                         ),
                     ),
                 )
+            }
+            proto::bytecode::Bytecode::Eof(_) => {
+                eyre::bail!("EOF bytecode not supported");
+            }
+            proto::bytecode::Bytecode::Eip7702(eip7702) => {
+                reth::revm::primitives::Bytecode::Eip7702(reth::revm::primitives::Eip7702Bytecode {
+                    delegated_address: Address::try_from(eip7702.delegated_address.as_slice())?,
+                    version: eip7702.version as u8,
+                    raw: eip7702.raw.as_slice().to_vec().into(),
+                })
             }
         })
     }
@@ -1044,10 +1052,6 @@ impl TryFrom<&proto::NonEmptyReceipt> for reth::primitives::Receipt {
                     })
                 })
                 .collect::<eyre::Result<_>>()?,
-            #[cfg(feature = "optimism")]
-            deposit_nonce: None,
-            #[cfg(feature = "optimism")]
-            deposit_receipt_version: None,
         })
     }
 }

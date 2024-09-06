@@ -1,4 +1,4 @@
-use crate::{db::Database, RollupContract, CHAIN_ID, CHAIN_SPEC};
+use crate::{db::Database, Zenith, CHAIN_ID, CHAIN_SPEC};
 use alloy_consensus::{Blob, SidecarCoder, SimpleCoder};
 use alloy_rlp::Decodable as _;
 use eyre::OptionExt;
@@ -26,7 +26,7 @@ pub async fn execute_block<Pool: TransactionPool>(
     db: &mut Database,
     pool: &Pool,
     tx: &TransactionSigned,
-    header: &RollupContract::BlockHeader,
+    header: &Zenith::BlockHeader,
     block_data: Bytes,
     block_data_hash: B256,
 ) -> eyre::Result<(BlockWithSenders, BundleState, Vec<Receipt>, Vec<ExecutionResult>)> {
@@ -58,7 +58,7 @@ pub async fn execute_block<Pool: TransactionPool>(
 }
 
 /// Construct header from the given rollup header.
-fn construct_header(db: &Database, header: &RollupContract::BlockHeader) -> eyre::Result<Header> {
+fn construct_header(db: &Database, header: &Zenith::BlockHeader) -> eyre::Result<Header> {
     let parent_block = if !header.sequence.is_zero() {
         db.get_block(header.sequence - U256::from(1))?
     } else {
@@ -280,8 +280,7 @@ mod tests {
     use secp256k1::{Keypair, Secp256k1};
 
     use crate::{
-        db::Database, execute_block, RollupContract::BlockHeader, CHAIN_ID,
-        ROLLUP_SUBMITTER_ADDRESS,
+        db::Database, execute_block, Zenith::BlockHeader, CHAIN_ID, ROLLUP_SUBMITTER_ADDRESS,
     };
 
     sol!(

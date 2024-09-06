@@ -95,7 +95,7 @@ message TransactionLegacy {
   optional uint64 chain_id = 1;
   uint64 nonce = 2;
   bytes gas_price = 3;
-  uint64 gas_limit = 4;
+  bytes gas_limit = 4;
   TxKind to = 5;
   bytes value = 6;
   bytes input = 7;
@@ -105,7 +105,7 @@ message TransactionEip2930 {
   uint64 chain_id = 1;
   uint64 nonce = 2;
   bytes gas_price = 3;
-  uint64 gas_limit = 4;
+  bytes gas_limit = 4;
   TxKind to = 5;
   bytes value = 6;
   repeated AccessListItem access_list = 7;
@@ -115,7 +115,7 @@ message TransactionEip2930 {
 message TransactionEip1559 {
   uint64 chain_id = 1;
   uint64 nonce = 2;
-  uint64 gas_limit = 3;
+  bytes gas_limit = 3;
   bytes max_fee_per_gas = 4;
   bytes max_priority_fee_per_gas = 5;
   TxKind to = 6;
@@ -127,7 +127,7 @@ message TransactionEip1559 {
 message TransactionEip4844 {
   uint64 chain_id = 1;
   uint64 nonce = 2;
-  uint64 gas_limit = 3;
+  bytes gas_limit = 3;
   bytes max_fee_per_gas = 4;
   bytes max_priority_fee_per_gas = 5;
   bytes to = 6;
@@ -141,7 +141,7 @@ message TransactionEip4844 {
 message TransactionEip7702 {
   uint64 chain_id = 1;
   uint64 nonce = 2;
-  uint64 gas_limit = 3;
+  bytes gas_limit = 3;
   bytes max_fee_per_gas = 4;
   bytes max_priority_fee_per_gas = 5;
   TxKind to = 6;
@@ -169,9 +169,9 @@ message AuthorizationListItem {
 }
 
 message Authorization {
-  uint64 chain_id = 1;
+  bytes chain_id = 1;
   bytes address = 2;
-  optional uint64 nonce = 3;
+  uint64 nonce = 3;
 }
 
 message ExecutionOutcome {
@@ -230,7 +230,8 @@ message Bytecode {
   oneof bytecode {
     bytes legacy_raw = 1;
     LegacyAnalyzedBytecode legacy_analyzed = 2;
-    // TODO: add EOF
+    EofBytecode eof = 3;
+    Eip7702Bytecode eip7702 = 4;
   }
 }
 
@@ -238,6 +239,15 @@ message LegacyAnalyzedBytecode {
   bytes bytecode = 1;
   uint64 original_len = 2;
   repeated uint32 jump_table = 3;
+}
+
+// TODO: add EOF bytecode fields
+message EofBytecode {}
+
+message Eip7702Bytecode {
+  bytes delegated_address = 1;
+  uint64 version = 2;
+  bytes raw = 3;
 }
 
 message BlockReverts {

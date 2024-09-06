@@ -1,5 +1,6 @@
 #![warn(unused_crate_dependencies)]
 
+use futures_util::StreamExt;
 use reth_execution_types::ExecutionOutcome;
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
@@ -32,7 +33,7 @@ impl<Node: FullNodeComponents + Unpin> Future for InMemoryStateExEx<Node> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
 
-        while let Some(notification) = ready!(this.ctx.notifications.poll_recv(cx)) {
+        while let Some(notification) = ready!(this.ctx.notifications.poll_next_unpin(cx)) {
             match &notification {
                 ExExNotification::ChainCommitted { new } => {
                     info!(committed_chain = ?new.range(), "Received commit");
@@ -76,7 +77,7 @@ mod tests {
     use reth::revm::db::BundleState;
     use reth_execution_types::{Chain, ExecutionOutcome};
     use reth_exex_test_utils::{test_exex_context, PollOnce};
-    use reth_testing_utils::generators::{self, random_block, random_receipt};
+    use reth_testing_utils::generators::{self, random_block, random_receipt, BlockParams};
     use std::pin::pin;
 
     #[tokio::test]
@@ -89,9 +90,10 @@ mod tests {
         let mut expected_state = ExecutionOutcome::default();
 
         // Generate first block and its state
-        let block_1 = random_block(&mut rng, 0, None, Some(1), None)
-            .seal_with_senders()
-            .ok_or(eyre::eyre!("failed to recover senders"))?;
+        let block_1 =
+            random_block(&mut rng, 0, BlockParams { tx_count: Some(1), ..Default::default() })
+                .seal_with_senders()
+                .ok_or(eyre::eyre!("failed to recover senders"))?;
         let block_number_1 = block_1.number;
         let execution_outcome1 = ExecutionOutcome::new(
             BundleState::default(),
@@ -113,9 +115,10 @@ mod tests {
         assert_eq!(exex.as_mut().execution_outcome, expected_state);
 
         // Generate second block and its state
-        let block_2 = random_block(&mut rng, 1, None, Some(2), None)
-            .seal_with_senders()
-            .ok_or(eyre::eyre!("failed to recover senders"))?;
+        let block_2 =
+            random_block(&mut rng, 1, BlockParams { tx_count: Some(2), ..Default::default() })
+                .seal_with_senders()
+                .ok_or(eyre::eyre!("failed to recover senders"))?;
         let execution_outcome2 = ExecutionOutcome::new(
             BundleState::default(),
             vec![random_receipt(&mut rng, &block_2.body[0], None)].into(),

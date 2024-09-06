@@ -1,4 +1,4 @@
-use futures::Future;
+use futures::{Future, StreamExt};
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
@@ -19,7 +19,7 @@ async fn exex_init<Node: FullNodeComponents>(
 /// This ExEx just prints out whenever either a new chain of blocks being added, or a chain of
 /// blocks being re-orged. After processing the chain, emits an [ExExEvent::FinishedHeight] event.
 async fn exex<Node: FullNodeComponents>(mut ctx: ExExContext<Node>) -> eyre::Result<()> {
-    while let Some(notification) = ctx.notifications.recv().await {
+    while let Some(notification) = ctx.notifications.next().await {
         match &notification {
             ExExNotification::ChainCommitted { new } => {
                 info!(committed_chain = ?new.range(), "Received commit");
