@@ -6,7 +6,7 @@ use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
 use tokio::sync::{broadcast, mpsc};
-use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 use tonic::{transport::Server, Request, Response, Status};
 
 #[derive(Debug)]
@@ -41,7 +41,7 @@ async fn exex<Node: FullNodeComponents>(
     mut ctx: ExExContext<Node>,
     notifications: broadcast::Sender<ExExNotification>,
 ) -> eyre::Result<()> {
-    while let Some(notification) = ctx.notifications.recv().await {
+    while let Some(notification) = ctx.notifications.next().await {
         if let Some(committed_chain) = notification.committed_chain() {
             ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
         }

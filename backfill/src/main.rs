@@ -4,7 +4,7 @@ use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
 
 use clap::{Args, Parser};
 use eyre::OptionExt;
-use futures::{FutureExt, TryStreamExt};
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use jsonrpsee::tracing::instrument;
 use reth::{
     args::utils::DefaultChainSpecParser,
@@ -79,7 +79,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
     async fn start(mut self) -> eyre::Result<()> {
         loop {
             tokio::select! {
-                Some(notification) = self.ctx.notifications.recv() => {
+                Some(notification) = self.ctx.notifications.next() => {
                     self.handle_notification(notification).await?;
                 }
                 Some(message) = self.backfill_rx.recv() => {

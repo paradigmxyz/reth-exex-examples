@@ -25,6 +25,7 @@ alloy-rlp = "0.3"
 alloy-sol-types.workspace = true
 
 # async
+futures-util.workspace = true
 tokio.workspace = true
 
 # misc

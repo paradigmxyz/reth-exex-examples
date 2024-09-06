@@ -9641,6 +9641,7 @@ dependencies = [
  "alloy-sol-types 0.8.0",
  "eyre",
  "foundry-blob-explorers",
+ "futures-util",
  "once_cell",
  "reth",
  "reth-chainspec 1.0.6 (git+https://github.com/paradigmxyz/reth?branch=alexey/exexcontext-notifications-subscribe)",
