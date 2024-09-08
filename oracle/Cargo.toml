@@ -31,6 +31,10 @@ futures.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 
+tungstenite = { version = "0.21", features = ["native-tls"] }
+
 # misc
 clap = "4" 
 eyre.workspace = true
+serde = "1"
+serde_json = "1"

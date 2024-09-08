@@ -8,6 +8,7 @@ use reth_network::{protocol::IntoRlpxSubProtocol, NetworkProtocols};
 use reth_node_ethereum::EthereumNode;
 
 mod cli_ext;
+mod data_feeder;
 mod exex;
 mod network;
 mod oracle;
