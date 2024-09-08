@@ -23,7 +23,7 @@ reth-tracing.workspace = true
 reth.workspace = true
 
 # networking
-discv5 = "0.6"
+discv5 = "0.7"
 enr = "0.12"
 
 # async

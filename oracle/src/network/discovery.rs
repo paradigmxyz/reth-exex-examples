@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use discv5::{enr::secp256k1::rand, Enr, Event, ListenConfig};
 use reth::network::config::SecretKey;
 use reth_discv5::{enr::EnrCombinedKeyWrapper, Config, Discv5};

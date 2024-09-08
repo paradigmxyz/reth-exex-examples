@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use connection::{OracleCommand, OracleConnHandler};
 use reth_eth_wire::{protocol::Protocol, Capability};
 use reth_network::{protocol::ProtocolHandler, Direction};
