@@ -1,5 +1,14 @@
 use serde::{Deserialize, Serialize};
 
+/// Struct representing the full JSON response from Binance
+#[derive(Serialize, Deserialize, Debug)]
+pub(crate) struct BinanceResponse {
+    /// Stream name (e.g., "ethusdt@ticker")
+    stream: String,
+    /// The ticker data nested inside the `data` field
+    pub data: Ticker,
+}
+
 /// Binance ticker data
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct Ticker {
@@ -11,7 +20,7 @@ pub(crate) struct Ticker {
     event_time: u64,
     /// Trading pair symbol
     #[serde(rename = "s")]
-    symbol: String,
+    pub(crate) symbol: String,
     /// Price change over the last 24 hours
     #[serde(rename = "p")]
     price_change: String,
@@ -72,23 +81,4 @@ pub(crate) struct Ticker {
     /// Total number of trades
     #[serde(rename = "n")]
     num_trades: u64,
-}
-
-pub(crate) struct BinanceDataFeeder {
-    symbols: Vec<String>,
-}
-
-impl BinanceDataFeeder {
-    pub(crate) fn new(symbols: Vec<String>) -> Self {
-        Self { symbols }
-    }
-    async fn connect(
-        &self,
-    ) -> tokio_tungstenite::tungstenite::Result<
-        tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
-    > {
-        let url = format!("wss://stream.binance.com:9443/ws/{}@ticker", self.symbol.to_lowercase());
-        let (ws_stream, _) = connect_async(url).await?;
-        Ok(ws_stream)
-    }
 }

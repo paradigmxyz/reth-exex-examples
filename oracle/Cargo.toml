@@ -30,8 +30,10 @@ enr = "0.12"
 futures.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
+tokio-tungstenite = "0.23"
 
-tungstenite = { version = "0.21", features = ["native-tls"] }
+
+thiserror = "1"
 
 # misc
 clap = "4" 
