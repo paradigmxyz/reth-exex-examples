@@ -3,6 +3,7 @@ use futures::FutureExt;
 use reth_tracing::tracing::{error, info};
 use std::{
     future::Future,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,
     task::{Context, Poll},
 };
@@ -19,7 +20,9 @@ pub(crate) struct Network {
 
 impl Network {
     pub(crate) async fn new(tcp_port: u16, udp_port: u16) -> eyre::Result<Self> {
-        let discovery = Discovery::new(tcp_port, udp_port).await?;
+        let disc_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), udp_port);
+        let rlpx_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), tcp_port);
+        let discovery = Discovery::new(disc_addr, rlpx_addr).await?;
         Ok(Self { discovery })
     }
 }

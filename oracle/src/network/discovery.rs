@@ -7,7 +7,7 @@ use reth_network_peers::NodeRecord;
 use reth_tracing::tracing::info;
 use std::{
     future::Future,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::SocketAddr,
     pin::Pin,
     task::{ready, Context, Poll},
 };
@@ -25,11 +25,11 @@ pub(crate) struct Discovery {
 
 impl Discovery {
     /// Starts a new discovery node.
-    pub(crate) async fn new(udp_port: u16, tcp_port: u16) -> eyre::Result<Discovery> {
+    pub(crate) async fn new(
+        disc_addr: SocketAddr,
+        rlpx_addr: SocketAddr,
+    ) -> eyre::Result<Discovery> {
         let secret_key = SecretKey::new(&mut rand::thread_rng());
-
-        let disc_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), udp_port);
-        let rlpx_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), tcp_port);
 
         let config = ListenConfig::from(disc_addr);
         let discv5_config = Config::builder(rlpx_addr)
@@ -87,14 +87,19 @@ impl Future for Discovery {
 mod tests {
     use crate::network::discovery::Discovery;
     use reth_tracing::tracing::info;
+    use std::net::SocketAddr;
 
     #[tokio::test]
     async fn can_establish_discv5_session_with_peer() {
         reth_tracing::init_test_tracing();
-        let mut node_1 = Discovery::new(30301, 30303).await.unwrap();
+        let discv5_addr: SocketAddr = format!("127.0.0.1:30301").parse().unwrap();
+        let rlpx_addr: SocketAddr = format!("127.0.0.1:30303").parse().unwrap();
+        let mut node_1 = Discovery::new(discv5_addr, rlpx_addr).await.unwrap();
         let node_1_enr = node_1.local_enr();
 
-        let mut node_2 = Discovery::new(30302, 30303).await.unwrap();
+        let discv5_addr: SocketAddr = format!("127.0.0.1:30302").parse().unwrap();
+        let rlpx_addr: SocketAddr = format!("127.0.0.1:30303").parse().unwrap();
+        let mut node_2 = Discovery::new(discv5_addr, rlpx_addr).await.unwrap();
 
         let node_2_enr = node_2.local_enr();
 
