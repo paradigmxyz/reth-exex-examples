@@ -92,13 +92,13 @@ mod tests {
     #[tokio::test]
     async fn can_establish_discv5_session_with_peer() {
         reth_tracing::init_test_tracing();
-        let discv5_addr: SocketAddr = format!("127.0.0.1:30301").parse().unwrap();
-        let rlpx_addr: SocketAddr = format!("127.0.0.1:30303").parse().unwrap();
+        let discv5_addr: SocketAddr = "127.0.0.1:30301".to_string().parse().unwrap();
+        let rlpx_addr: SocketAddr = "127.0.0.1:30303".to_string().parse().unwrap();
         let mut node_1 = Discovery::new(discv5_addr, rlpx_addr).await.unwrap();
         let node_1_enr = node_1.local_enr();
 
-        let discv5_addr: SocketAddr = format!("127.0.0.1:30302").parse().unwrap();
-        let rlpx_addr: SocketAddr = format!("127.0.0.1:30303").parse().unwrap();
+        let discv5_addr: SocketAddr = "127.0.0.1:30302".to_string().parse().unwrap();
+        let rlpx_addr: SocketAddr = "127.0.0.1:30303".to_string().parse().unwrap();
         let mut node_2 = Discovery::new(discv5_addr, rlpx_addr).await.unwrap();
 
         let node_2_enr = node_2.local_enr();
