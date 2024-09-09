@@ -1,4 +1,5 @@
 use futures::{Stream, StreamExt};
+use reth_tracing::tracing::error;
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -7,6 +8,12 @@ use thiserror::Error;
 use ticker::{BinanceResponse, Ticker};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+
+macro_rules! block_on {
+    ($expr:expr) => {
+        tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on($expr))
+    };
+}
 
 pub(crate) mod ticker;
 
@@ -18,12 +25,16 @@ pub(crate) enum BinanceDataFeederError {
     /// Error decoding the message.
     #[error("error decoding message")]
     Decode(#[from] serde_json::Error),
+    /// Error reconnecting after max retries.
+    #[error("reached max number of reconnection attempts")]
+    MaxRetriesExceeded,
 }
 
 /// This structure controls the interaction with the Binance WebSocket API.
 pub(crate) struct BinanceDataFeeder {
     /// The WebSocket stream.
-    inner: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    inner: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
+    url: String,
 }
 
 impl BinanceDataFeeder {
@@ -36,9 +47,34 @@ impl BinanceDataFeeder {
             .join("/");
 
         let url = format!("wss://stream.binance.com/stream?streams={}", query);
-        let (client, _) = connect_async(url.to_string()).await?;
+        let client = Self::connect_with_retries(url.to_string(), 10).await?;
 
-        Ok(Self { inner: client })
+        Ok(Self { inner: Some(client), url })
+    }
+
+    /// Function to connect with retries and an optional delay between retries
+    async fn connect_with_retries(
+        url: String,
+        max_retries: usize,
+    ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, BinanceDataFeederError> {
+        let mut attempts = 0;
+
+        while attempts < max_retries {
+            let conn = connect_async(url.clone()).await;
+
+            match conn {
+                Ok((connection, _)) => return Ok(connection),
+                Err(e) => {
+                    error!(?e, attempts, max_retries, "Connection attempt failed, retrying...");
+                    attempts += 1;
+                    if attempts < max_retries {
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    }
+                }
+            }
+        }
+
+        Err(BinanceDataFeederError::MaxRetriesExceeded)
     }
 }
 
@@ -50,18 +86,34 @@ impl Stream for BinanceDataFeeder {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
 
-        match this.inner.poll_next_unpin(cx) {
+        let mut connection = this.inner.take().expect("inner WebSocket client is missing");
+
+        match connection.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(msg))) => {
                 let msg = msg.into_text()?;
                 let resp: BinanceResponse = serde_json::from_str(&msg)?;
+                this.inner = Some(connection);
                 Poll::Ready(Some(Ok(resp.data)))
             }
             Poll::Ready(Some(Err(e))) => {
-                // we should handle reconnections here
-                Poll::Ready(Some(Err(BinanceDataFeederError::Connection(e))))
+                // handle ws disconnections
+                error!(?e, "Binance ws disconnected, reconnecting");
+                match block_on!(Self::connect_with_retries(this.url.clone(), 10)) {
+                    Ok(conn) => {
+                        this.inner = Some(conn);
+                        Poll::Pending
+                    }
+                    Err(reconnect_error) => {
+                        error!(?reconnect_error, "Failed to reconnect after max retries");
+                        Poll::Ready(Some(Err(reconnect_error)))
+                    }
+                }
             }
             Poll::Ready(None) => Poll::Ready(None),
-            Poll::Pending => Poll::Pending,
+            Poll::Pending => {
+                this.inner = Some(connection);
+                Poll::Pending
+            }
         }
     }
 }
