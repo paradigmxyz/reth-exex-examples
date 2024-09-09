@@ -1,12 +1,13 @@
 [workspace]
 members = [
-  "backfill",
-  "discv5",
-  "in-memory-state",
-  "minimal",
-  "op-bridge",
-  "remote",
-  "rollup",
+ "backfill",
+ "discv5",
+ "in-memory-state",
+ "minimal",
+ "oracle",
+ "op-bridge", 
+ "remote",
+ "rollup",
 ]
 resolver = "2"
 
@@ -25,14 +26,20 @@ reth-discv5 = { git = "https://github.com/paradigmxyz/reth" }
 reth-execution-errors = { git = "https://github.com/paradigmxyz/reth" }
 reth-execution-types = { git = "https://github.com/paradigmxyz/reth" }
 reth-exex = { git = "https://github.com/paradigmxyz/reth", features = ["serde"] }
+reth-eth-wire = { git = "https://github.com/paradigmxyz/reth" }
+reth-evm = { git = "https://github.com/paradigmxyz/reth" }
+reth-network = { git = "https://github.com/paradigmxyz/reth" }
+reth-network-api = { git = "https://github.com/paradigmxyz/reth" }
 reth-network-peers = { git = "https://github.com/paradigmxyz/reth" }
 reth-node-api = { git = "https://github.com/paradigmxyz/reth" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth" }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth" }
 reth-provider = { git = "https://github.com/paradigmxyz/reth" }
 reth-revm = { git = "https://github.com/paradigmxyz/reth" }
-reth-evm = { git = "https://github.com/paradigmxyz/reth" }
+reth-rpc-types = { git = "https://github.com/paradigmxyz/reth" }
 reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
+
+
 
 # alloy
 alloy-sol-types = { version = "0.8", features = ["json"] }
