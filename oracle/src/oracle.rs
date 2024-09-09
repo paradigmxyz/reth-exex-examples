@@ -1,4 +1,4 @@
-use futures::FutureExt;
+use futures::{FutureExt, StreamExt};
 use reth_node_api::FullNodeComponents;
 use reth_tracing::tracing::{error, info};
 use std::{
@@ -7,7 +7,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{exex::ExEx, network::Network};
+use crate::{exex::ExEx, network::Network, offchain_data::DataFeederStream};
 
 /// The Oracle struct is a long running task that orchestrates discovery of new peers,
 /// decoding data from chain events (ExEx) and gossiping it to peers.
@@ -17,11 +17,13 @@ pub(crate) struct Oracle<Node: FullNodeComponents> {
     network: Network,
     /// The execution extension task for this node.
     exex: ExEx<Node>,
+    /// The offchain data feed stream.
+    data_feed: DataFeederStream,
 }
 
 impl<Node: FullNodeComponents> Oracle<Node> {
-    pub(crate) async fn new(exex: ExEx<Node>, network: Network) -> eyre::Result<Self> {
-        Ok(Self { exex, network })
+    pub(crate) fn new(exex: ExEx<Node>, network: Network, data_feed: DataFeederStream) -> Self {
+        Self { exex, network, data_feed }
     }
 }
 
@@ -44,6 +46,20 @@ impl<Node: FullNodeComponents> Future for Oracle<Node> {
                     // Exit match and continue to poll exex
                     break;
                 }
+            }
+        }
+
+        // Poll the data feed future until it's drained
+        while let Poll::Ready(item) = this.data_feed.poll_next_unpin(cx) {
+            match item {
+                Some(Ok(data)) => {
+                    // Process the data feed by signing it and sending it to the network
+                }
+                Some(Err(e)) => {
+                    error!(?e, "Data feed task encountered an error");
+                    return Poll::Ready(Err(e.into()));
+                }
+                None => break,
             }
         }
 

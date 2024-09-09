@@ -2,6 +2,7 @@ use clap::Parser;
 use cli_ext::OracleExt;
 use exex::ExEx;
 use network::{proto::OracleProtoHandler, Network};
+use offchain_data::DataFeederStream;
 use oracle::Oracle;
 use reth::args::utils::DefaultChainSpecParser;
 use reth_network::{protocol::IntoRlpxSubProtocol, NetworkProtocols};
@@ -28,7 +29,8 @@ fn main() -> eyre::Result<()> {
 
                 let exex = ExEx::new(ctx);
                 let network = Network::new(tcp_port, udp_port).await?;
-                let oracle = Oracle::new(exex, network).await?;
+                let data_feed = DataFeederStream::new(args.binance_symbols).await?;
+                let oracle = Oracle::new(exex, network, data_feed);
                 Ok(oracle)
             })
             .launch()

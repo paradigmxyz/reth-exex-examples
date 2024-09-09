@@ -1,19 +1,53 @@
-use std::pin::Pin;
-
-use binance::BinanceDataFeederError;
-use futures::stream::Stream;
+use binance::{ticker::Ticker, BinanceDataFeeder, BinanceDataFeederError};
+use futures::{stream::Stream, StreamExt};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+use thiserror::Error;
 
 pub(crate) mod binance;
 
-/// This trait must be implemented by any data feeder that wants to be used by the Oracle.
-///
-/// It takes care of feeding off-chain data to the Oracle.
-pub(crate) trait DataFeeder {
-    /// The Item type that the stream will return.
-    type Item;
+/// The enum that represents the various types of data feeds, e.g., Binance.
+pub(crate) enum DataFeeds {
+    Binance(Ticker),
+}
 
-    /// Converts the data feeder into a stream of items.
-    fn into_stream(
-        self,
-    ) -> Pin<Box<dyn Stream<Item = Result<Self::Item, BinanceDataFeederError>> + Send>>;
+/// The error enum that wraps errors from all data feeders.
+#[derive(Error, Debug)]
+pub(crate) enum DataFeederError {
+    #[error(transparent)]
+    Binance(#[from] BinanceDataFeederError),
+}
+
+/// The struct that implements the Stream trait for polling multiple data feeds.
+pub(crate) struct DataFeederStream {
+    binance: BinanceDataFeeder,
+    // Add other feeder fields if needed.
+}
+
+impl DataFeederStream {
+    /// Creates a new instance of the DataFeederStream with initialized Binance feeder.
+    pub(crate) async fn new(binance_symbols: Vec<String>) -> Result<Self, DataFeederError> {
+        let binance = BinanceDataFeeder::new(binance_symbols).await?;
+        Ok(Self { binance })
+    }
+}
+
+/// Implementing the Stream trait for DataFeederStream to wrap the individual feeders.
+impl Stream for DataFeederStream {
+    type Item = Result<DataFeeds, DataFeederError>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+
+        match this.binance.poll_next_unpin(cx) {
+            Poll::Ready(Some(Ok(ticker))) => Poll::Ready(Some(Ok(DataFeeds::Binance(ticker)))),
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(DataFeederError::Binance(e)))),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+        }
+
+        // Add other data-feeds here.
+    }
 }

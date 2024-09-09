@@ -8,9 +8,7 @@ use ticker::{BinanceResponse, Ticker};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 
-use super::DataFeeder;
-
-mod ticker;
+pub(crate) mod ticker;
 
 #[derive(Error, Debug)]
 pub(crate) enum BinanceDataFeederError {
@@ -24,8 +22,6 @@ pub(crate) enum BinanceDataFeederError {
 
 /// This structure controls the interaction with the Binance WebSocket API.
 pub(crate) struct BinanceDataFeeder {
-    /// The URL of the Binance WebSocket API.
-    url: String,
     /// The WebSocket stream.
     inner: WebSocketStream<MaybeTlsStream<TcpStream>>,
 }
@@ -42,7 +38,7 @@ impl BinanceDataFeeder {
         let url = format!("wss://stream.binance.com/stream?streams={}", query);
         let (client, _) = connect_async(url.to_string()).await?;
 
-        Ok(Self { url, inner: client })
+        Ok(Self { inner: client })
     }
 }
 
@@ -67,17 +63,6 @@ impl Stream for BinanceDataFeeder {
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
-    }
-}
-
-impl DataFeeder for BinanceDataFeeder {
-    type Item = Ticker;
-
-    /// Converts the Binance feeder into a stream of `Ticker` items.
-    fn into_stream(
-        self,
-    ) -> Pin<Box<dyn Stream<Item = Result<Self::Item, BinanceDataFeederError>> + Send>> {
-        Box::pin(self)
     }
 }
 
