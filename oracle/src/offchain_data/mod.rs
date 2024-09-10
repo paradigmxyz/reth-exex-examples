@@ -1,4 +1,4 @@
-use binance::{ticker::Ticker, BinanceDataFeeder, BinanceDataFeederError};
+use binance::{feeder::BinanceDataFeederError, ticker::Ticker, BinanceConnection};
 use futures::{stream::Stream, StreamExt};
 use std::{
     pin::Pin,
@@ -22,14 +22,14 @@ pub(crate) enum DataFeederError {
 
 /// The struct that implements the Stream trait for polling multiple data feeds.
 pub(crate) struct DataFeederStream {
-    binance: BinanceDataFeeder,
+    binance: BinanceConnection,
     // Add other feeder fields if needed.
 }
 
 impl DataFeederStream {
     /// Creates a new instance of the DataFeederStream with initialized Binance feeder.
     pub(crate) async fn new(binance_symbols: Vec<String>) -> Result<Self, DataFeederError> {
-        let binance = BinanceDataFeeder::new(binance_symbols).await?;
+        let binance = BinanceConnection::new(binance_symbols).await?;
         Ok(Self { binance })
     }
 }
