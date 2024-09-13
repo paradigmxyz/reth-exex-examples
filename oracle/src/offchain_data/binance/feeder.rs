@@ -101,6 +101,7 @@ mod tests {
     use super::*;
     use futures::StreamExt;
 
+    #[ignore]
     #[tokio::test]
     async fn can_connect() {
         let symbols = vec!["btcusdt".to_string(), "ethusdt".to_string()];
