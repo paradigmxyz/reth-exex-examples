@@ -42,40 +42,23 @@ impl Stream for OracleConnection {
             return Poll::Ready(Some(initial_ping.encoded()));
         }
 
-        loop {
-            if let Poll::Ready(Some(cmd)) = this.commands.poll_next_unpin(cx) {
-                return match cmd {
-                    OracleCommand::Message { msg, response } => {
-                        this.pending_pong = Some(response);
-                        Poll::Ready(Some(OracleProtoMessage::ping_message(msg).encoded()))
-                    }
-                };
+        let Some(msg) = ready!(this.conn.poll_next_unpin(cx)) else { return Poll::Ready(None) };
+
+        let Some(msg) = OracleProtoMessage::decode_message(&mut &msg[..]) else {
+            return Poll::Ready(None);
+        };
+
+        match msg.message {
+            OracleProtoMessageKind::Ping => {
+                return Poll::Ready(Some(OracleProtoMessage::pong().encoded()))
             }
-
-            let Some(msg) = ready!(this.conn.poll_next_unpin(cx)) else { return Poll::Ready(None) };
-
-            let Some(msg) = OracleProtoMessage::decode_message(&mut &msg[..]) else {
-                return Poll::Ready(None);
-            };
-
-            match msg.message {
-                OracleProtoMessageKind::Ping => {
-                    return Poll::Ready(Some(OracleProtoMessage::pong().encoded()))
-                }
-                OracleProtoMessageKind::Pong => {}
-                OracleProtoMessageKind::PingMessage(msg) => {
-                    return Poll::Ready(Some(OracleProtoMessage::pong_message(msg).encoded()))
-                }
-                OracleProtoMessageKind::PongMessage(msg) => {
-                    if let Some(sender) = this.pending_pong.take() {
-                        sender.send(msg).ok();
-                    }
-                    continue;
-                }
+            OracleProtoMessageKind::Pong => {}
+            OracleProtoMessageKind::SignedTicker(_) => {
+                // TODO: verify signature and keep count
             }
-
-            return Poll::Pending;
         }
+
+        Poll::Pending
     }
 }
 

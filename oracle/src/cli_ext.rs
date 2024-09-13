@@ -2,7 +2,7 @@ use clap::Args;
 
 pub const DEFAULT_DISCOVERY_PORT: u16 = 30304;
 pub const DEFAULT_RLPX_PORT: u16 = 30303;
-pub const DEFAULT_BINANCE_SYMBOLS: &str = "btcusdt,ethusdt";
+pub const DEFAULT_BINANCE_SYMBOLS: &str = "btcusdc,ethusdc";
 
 #[derive(Debug, Clone, Args)]
 pub(crate) struct OracleExt {

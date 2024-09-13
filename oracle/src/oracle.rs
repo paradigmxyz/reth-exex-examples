@@ -52,7 +52,7 @@ impl<Node: FullNodeComponents> Future for Oracle<Node> {
         // Poll the data feed future until it's drained
         while let Poll::Ready(item) = this.data_feed.poll_next_unpin(cx) {
             match item {
-                Some(Ok(data)) => {
+                Some(Ok(_data)) => {
                     // Process the data feed by signing it and sending it to the network
                 }
                 Some(Err(e)) => {
