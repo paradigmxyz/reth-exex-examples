@@ -1,3 +1,11 @@
+use crate::{
+    exex::ExEx,
+    network::{proto::data::SignedTicker, Network},
+    offchain_data::{DataFeederStream, DataFeeds},
+};
+use alloy_rlp::{BytesMut, Encodable};
+use alloy_signer::SignerSync;
+use alloy_signer_local::PrivateKeySigner;
 use futures::{FutureExt, StreamExt};
 use reth_node_api::FullNodeComponents;
 use reth_tracing::tracing::{error, info};
@@ -6,8 +14,6 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-
-use crate::{exex::ExEx, network::Network, offchain_data::DataFeederStream};
 
 /// The Oracle struct is a long running task that orchestrates discovery of new peers,
 /// decoding data from chain events (ExEx) and gossiping it to peers.
@@ -19,11 +25,20 @@ pub(crate) struct Oracle<Node: FullNodeComponents> {
     exex: ExEx<Node>,
     /// The offchain data feed stream.
     data_feed: DataFeederStream,
+    /// The signer to sign the data feed.
+    signer: PrivateKeySigner,
+    /// Half of the broadcast channel to send data to gossip.
+    to_gossip: tokio::sync::broadcast::Sender<SignedTicker>,
 }
 
 impl<Node: FullNodeComponents> Oracle<Node> {
-    pub(crate) fn new(exex: ExEx<Node>, network: Network, data_feed: DataFeederStream) -> Self {
-        Self { exex, network, data_feed }
+    pub(crate) fn new(
+        exex: ExEx<Node>,
+        network: Network,
+        data_feed: DataFeederStream,
+        to_gossip: tokio::sync::broadcast::Sender<SignedTicker>,
+    ) -> Self {
+        Self { exex, network, data_feed, signer: PrivateKeySigner::random(), to_gossip }
     }
 }
 
@@ -52,8 +67,13 @@ impl<Node: FullNodeComponents> Future for Oracle<Node> {
         // Poll the data feed future until it's drained
         while let Poll::Ready(item) = this.data_feed.poll_next_unpin(cx) {
             match item {
-                Some(Ok(_data)) => {
-                    // Process the data feed by signing it and sending it to the network
+                Some(Ok(ticker_data)) => {
+                    let DataFeeds::Binance(ticker) = ticker_data;
+                    let mut buffer = BytesMut::new();
+                    ticker.encode(&mut buffer);
+                    let signature = this.signer.sign_message_sync(&buffer)?;
+                    let signed_ticker = SignedTicker::new(ticker, signature, this.signer.address());
+                    this.to_gossip.send(signed_ticker.clone())?;
                 }
                 Some(Err(e)) => {
                     error!(?e, "Data feed task encountered an error");

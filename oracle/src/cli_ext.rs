@@ -33,7 +33,7 @@ mod tests {
 
     #[test]
     fn test_oracle_ext() {
-        let cli = CommandParser::<OracleExt>::parse_from(&[
+        let cli = CommandParser::<OracleExt>::parse_from([
             "test",
             "--disc.tcp-port",
             "30304",

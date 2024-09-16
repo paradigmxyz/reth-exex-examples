@@ -18,7 +18,7 @@ pub(crate) mod data;
 pub(crate) enum OracleProtoMessageId {
     Ping = 0x00,
     Pong = 0x01,
-    TickData = 0x04,
+    TickData = 0x02,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -43,6 +43,14 @@ impl OracleProtoMessage {
     /// Returns the protocol for the `custom_rlpx` protocol.
     pub(crate) fn protocol() -> Protocol {
         Protocol::new(Self::capability(), 4)
+    }
+
+    /// Creates a signed ticker message
+    pub(crate) fn signed_ticker(data: SignedTicker) -> Self {
+        Self {
+            message_type: OracleProtoMessageId::TickData,
+            message: OracleProtoMessageKind::SignedTicker(Box::new(data)),
+        }
     }
 
     /// Creates a ping message
@@ -100,11 +108,13 @@ pub(crate) struct OracleProtoHandler {
     state: ProtocolState,
 }
 
+pub(crate) type ProtoEvents = mpsc::UnboundedReceiver<ProtocolEvent>;
+
 impl OracleProtoHandler {
     /// Creates a new `OracleProtoHandler` with the given protocol state.
-    pub(crate) fn new() -> Self {
-        let (tx, _) = mpsc::unbounded_channel();
-        Self { state: ProtocolState { events: tx } }
+    pub(crate) fn new() -> (Self, ProtoEvents) {
+        let (tx, rx) = mpsc::unbounded_channel();
+        (Self { state: ProtocolState { events: tx } }, rx)
     }
 }
 

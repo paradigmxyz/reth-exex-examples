@@ -24,13 +24,13 @@ fn main() -> eyre::Result<()> {
         let handle = builder
             .node(EthereumNode::default())
             .install_exex(ORACLE_EXEX_ID, move |ctx| async move {
-                let subproto = OracleProtoHandler::new();
+                let (subproto, proto_events) = OracleProtoHandler::new();
                 ctx.network().add_rlpx_sub_protocol(subproto.into_rlpx_sub_protocol());
 
                 let exex = ExEx::new(ctx);
-                let network = Network::new(tcp_port, udp_port).await?;
+                let (network, to_gossip) = Network::new(proto_events, tcp_port, udp_port).await?;
                 let data_feed = DataFeederStream::new(args.binance_symbols).await?;
-                let oracle = Oracle::new(exex, network, data_feed);
+                let oracle = Oracle::new(exex, network, data_feed, to_gossip);
                 Ok(oracle)
             })
             .launch()
