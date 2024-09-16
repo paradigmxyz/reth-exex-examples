@@ -86,7 +86,7 @@ impl OracleProtoMessage {
         let message_type = match id {
             0x00 => OracleProtoMessageId::Ping,
             0x01 => OracleProtoMessageId::Pong,
-            0x04 => OracleProtoMessageId::TickData,
+            0x02 => OracleProtoMessageId::TickData,
             _ => return None,
         };
         let message = match message_type {
