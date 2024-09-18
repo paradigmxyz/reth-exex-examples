@@ -1,4 +1,4 @@
-use futures::{Stream, StreamExt};
+use futures::{ready, Stream, StreamExt};
 use reth_tracing::tracing::error;
 use std::{
     pin::Pin,
@@ -79,19 +79,31 @@ impl Stream for BinanceDataFeeder {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
 
-        match this.inner.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok(msg))) => {
-                let msg = msg.into_text()?;
-                let resp: BinanceResponse = serde_json::from_str(&msg)?;
-                Poll::Ready(Some(Ok(resp.data)))
+        match ready!(this.inner.poll_next_unpin(cx)) {
+            Some(Ok(msg)) => {
+                let msg = match msg.into_text() {
+                    Ok(text) => text,
+                    Err(e) => {
+                        error!(?e, "Failed to convert message to text, skipping");
+                        return Poll::Pending;
+                    }
+                };
+
+                let msg = match serde_json::from_str::<BinanceResponse>(&msg) {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        error!(?e, ?msg, "Failed to decode message, skipping");
+                        return Poll::Pending;
+                    }
+                };
+
+                Poll::Ready(Some(Ok(msg.data)))
             }
-            Poll::Ready(Some(Err(e))) => {
-                // handle ws disconnections
+            Some(Err(e)) => {
                 error!(?e, "Binance ws disconnected, reconnecting");
                 Poll::Ready(Some(Err(BinanceDataFeederError::Connection(e))))
             }
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Pending => Poll::Pending,
+            None => Poll::Ready(None),
         }
     }
 }

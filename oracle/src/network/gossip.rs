@@ -1,4 +1,4 @@
-use reth_tracing::tracing::error;
+use reth_tracing::tracing::{error, info};
 use tokio::sync::{
     broadcast::{error::RecvError, Sender},
     mpsc::UnboundedSender,
@@ -42,9 +42,11 @@ impl Gossip {
             loop {
                 match receiver.recv().await {
                     Ok(signed_data) => {
-                        if let Err(e) = to_connection.send(OracleCommand::Tick(signed_data)) {
+                        if let Err(e) = to_connection.send(OracleCommand::Tick(signed_data.clone()))
+                        {
                             error!(?e, "Failed to broadcast message to peer");
                         }
+                        info!(?signed_data, "Broadcasted message to peer");
                     }
                     Err(e) => {
                         error!(?e, "Data feed task encountered an error");

@@ -1,6 +1,6 @@
 use crate::{
     exex::ExEx,
-    network::{proto::data::SignedTicker, Network},
+    network::{proto::data::SignedTicker, OracleNetwork},
     offchain_data::{DataFeederStream, DataFeeds},
 };
 use alloy_rlp::{BytesMut, Encodable};
@@ -20,7 +20,7 @@ use std::{
 pub(crate) struct Oracle<Node: FullNodeComponents> {
     /// The network task for this node.
     /// It is composed by a discovery task and a sub protocol RLPx task.
-    network: Network,
+    network: OracleNetwork,
     /// The execution extension task for this node.
     exex: ExEx<Node>,
     /// The offchain data feed stream.
@@ -34,7 +34,7 @@ pub(crate) struct Oracle<Node: FullNodeComponents> {
 impl<Node: FullNodeComponents> Oracle<Node> {
     pub(crate) fn new(
         exex: ExEx<Node>,
-        network: Network,
+        network: OracleNetwork,
         data_feed: DataFeederStream,
         to_gossip: tokio::sync::broadcast::Sender<SignedTicker>,
     ) -> Self {
@@ -73,7 +73,10 @@ impl<Node: FullNodeComponents> Future for Oracle<Node> {
                     ticker.encode(&mut buffer);
                     let signature = this.signer.sign_message_sync(&buffer)?;
                     let signed_ticker = SignedTicker::new(ticker, signature, this.signer.address());
-                    this.to_gossip.send(signed_ticker.clone())?;
+
+                    if let Err(err) = this.to_gossip.send(signed_ticker.clone()) {
+                        error!(?err, "Failed to send ticker to gossip");
+                    }
                 }
                 Some(Err(e)) => {
                     error!(?e, "Data feed task encountered an error");

@@ -22,9 +22,9 @@ reth-rpc-types.workspace = true
 reth-tracing.workspace = true
 reth.workspace = true
 
-alloy-signer-local = "0.3"
-alloy-signer = "0.3"
-alloy-rlp = "0.3"
+alloy-signer-local.workspace = true
+alloy-signer.workspace = true
+alloy-rlp.workspace = true
 
 # networking
 discv5 = "0.7"
@@ -42,5 +42,8 @@ thiserror = "1"
 # misc
 clap = "4" 
 eyre.workspace = true
-serde = "1"
-serde_json = "1"
+serde.workspace = true
+serde_json.workspace = true
+
+reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth" }
+reth-testing-utils = { git = "https://github.com/paradigmxyz/reth" }

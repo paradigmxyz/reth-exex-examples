@@ -93,7 +93,7 @@ impl OracleProtoMessage {
             OracleProtoMessageId::Ping => OracleProtoMessageKind::Ping,
             OracleProtoMessageId::Pong => OracleProtoMessageKind::Pong,
             OracleProtoMessageId::TickData => {
-                let data = SignedTicker::decode(buf).unwrap();
+                let data = SignedTicker::decode(buf).ok()?;
                 OracleProtoMessageKind::SignedTicker(Box::new(data))
             }
         };
@@ -105,7 +105,7 @@ impl OracleProtoMessage {
 /// This struct is responsible of incoming and outgoing connections.
 #[derive(Debug)]
 pub(crate) struct OracleProtoHandler {
-    state: ProtocolState,
+    pub(crate) state: ProtocolState,
 }
 
 pub(crate) type ProtoEvents = mpsc::UnboundedReceiver<ProtocolEvent>;

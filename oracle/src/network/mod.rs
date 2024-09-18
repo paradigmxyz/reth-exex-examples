@@ -15,9 +15,9 @@ mod discovery;
 mod gossip;
 pub(crate) mod proto;
 
-/// The Network struct is a long running task that orchestrates discovery of new peers and network
-/// gossiping via the RLPx subprotocol.
-pub(crate) struct Network {
+/// The OracleNetwork struct is a long running task that orchestrates discovery of new peers and
+/// network gossiping via the RLPx subprotocol.
+pub(crate) struct OracleNetwork {
     /// The discovery task for this node.
     discovery: Discovery,
     /// The protocol events channel.
@@ -26,7 +26,7 @@ pub(crate) struct Network {
     gossip: Gossip,
 }
 
-impl Network {
+impl OracleNetwork {
     pub(crate) async fn new(
         proto_events: proto::ProtoEvents,
         tcp_port: u16,
@@ -40,7 +40,7 @@ impl Network {
     }
 }
 
-impl Future for Network {
+impl Future for OracleNetwork {
     type Output = eyre::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -75,10 +75,12 @@ impl Future for Network {
                     this.gossip.start(to_connection)?;
                 }
                 Poll::Ready(None) => {
-                    return Poll::Ready(Ok(()));
+                    return Poll::Pending;
                 }
 
-                Poll::Pending => {}
+                Poll::Pending => {
+                    return Poll::Pending;
+                }
             }
         }
     }

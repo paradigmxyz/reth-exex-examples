@@ -43,12 +43,19 @@ reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
 
 # alloy
 alloy-sol-types = { version = "0.8", features = ["json"] }
+alloy-signer-local = "0.3"
+alloy-signer = "0.3"
+alloy-rlp = "0.3"
 
 # async
 futures = "0.3"
 futures-util = "0.3"
 tokio = { version = "1.0", features = ["full"] }
 tokio-stream = "0.1"
+
+# serde
+serde = "1"
+serde_json = "1"
 
 # misc
 eyre = "0.6"

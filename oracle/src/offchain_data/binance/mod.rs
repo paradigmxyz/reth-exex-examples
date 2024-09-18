@@ -62,10 +62,14 @@ impl Stream for BinanceConnection {
                     info!("Reconnected to Binance WebSocket successfully.");
                 }
                 Poll::Ready(Err(e)) => {
+                    info!(?e, "Failed to reconnect to Binance WebSocket.");
                     this.reconnection = None;
                     return Poll::Ready(Some(Err(e)));
                 }
-                Poll::Pending => return Poll::Pending,
+                Poll::Pending => {
+                    this.reconnection = Some(fut);
+                    return Poll::Pending;
+                }
             }
         }
 
@@ -75,10 +79,16 @@ impl Stream for BinanceConnection {
                 error!(?e, "Binance WebSocket disconnected. Attempting to reconnect...");
                 let fut = BinanceDataFeeder::new(this.inner.symbols.clone()).boxed();
                 this.reconnection = Some(fut);
+                // make sure we are awaken to poll the reconnection future
+                cx.waker().wake_by_ref();
                 Poll::Pending
             }
             Poll::Ready(None) => Poll::Ready(None),
-            Poll::Pending => Poll::Pending,
+            Poll::Pending => {
+                // wake up the task to poll the stream again
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
         }
     }
 }
