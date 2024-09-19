@@ -15,9 +15,10 @@ use std::{
     task::{ready, Context, Poll},
 };
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
 
 /// The commands supported by the OracleConnection.
+#[derive(Clone)]
 pub(crate) enum OracleCommand {
     /// Sends a signed tick to a peer
     Tick(SignedTicker),
@@ -27,6 +28,7 @@ pub(crate) enum OracleCommand {
 pub(crate) struct OracleConnection {
     conn: ProtocolConnection,
     commands: UnboundedReceiverStream<OracleCommand>,
+    signed_ticks: BroadcastStream<SignedTicker>,
     initial_ping: Option<OracleProtoMessage>,
     attestations: Vec<Address>,
 }
@@ -48,6 +50,10 @@ impl Stream for OracleConnection {
                         Poll::Ready(Some(OracleProtoMessage::signed_ticker(tick).encoded()))
                     }
                 };
+            }
+
+            if let Poll::Ready(Some(Ok(tick))) = this.signed_ticks.poll_next_unpin(cx) {
+                return Poll::Ready(Some(OracleProtoMessage::signed_ticker(tick).encoded()));
             }
 
             let Some(msg) = ready!(this.conn.poll_next_unpin(cx)) else { return Poll::Ready(None) };
@@ -115,6 +121,7 @@ impl ConnectionHandler for OracleConnHandler {
             conn,
             initial_ping: direction.is_outgoing().then(OracleProtoMessage::ping),
             commands: UnboundedReceiverStream::new(rx),
+            signed_ticks: BroadcastStream::new(self.state.to_peers.subscribe()),
             attestations: Vec::new(),
         }
     }

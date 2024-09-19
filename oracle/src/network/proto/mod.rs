@@ -102,19 +102,35 @@ impl OracleProtoMessage {
     }
 }
 
+pub(crate) type ProtoEvents = mpsc::UnboundedReceiver<ProtocolEvent>;
+pub(crate) type ToPeers = tokio::sync::broadcast::Sender<SignedTicker>;
+
 /// This struct is responsible of incoming and outgoing connections.
 #[derive(Debug)]
 pub(crate) struct OracleProtoHandler {
     pub(crate) state: ProtocolState,
 }
 
-pub(crate) type ProtoEvents = mpsc::UnboundedReceiver<ProtocolEvent>;
+/// The size of the broadcast channel.
+///
+/// This value is based on the estimated message rate and the tolerance for lag.
+/// - We assume an average of 10-20 updates per second per symbol.
+/// - For 2 symbols (e.g., ETHUSDC and BTCUSDC), this gives approximately 20-40 messages per second.
+/// - To allow subscribers to catch up if they fall behind, we provide a lag tolerance of 5 seconds.
+///
+/// Thus, the buffer size is calculated as:
+///
+/// `Buffer Size = Message Rate per Second * Lag Tolerance`
+///
+/// For 2 symbols, we calculate: `40 * 5 = 200`.
+const BROADCAST_CHANNEL_SIZE: usize = 200;
 
 impl OracleProtoHandler {
     /// Creates a new `OracleProtoHandler` with the given protocol state.
-    pub(crate) fn new() -> (Self, ProtoEvents) {
+    pub(crate) fn new() -> (Self, ProtoEvents, ToPeers) {
         let (tx, rx) = mpsc::unbounded_channel();
-        (Self { state: ProtocolState { events: tx } }, rx)
+        let (to_peers, _) = tokio::sync::broadcast::channel(BROADCAST_CHANNEL_SIZE);
+        (Self { state: ProtocolState { events: tx, to_peers: to_peers.clone() } }, rx, to_peers)
     }
 }
 
@@ -138,10 +154,11 @@ impl ProtocolHandler for OracleProtoHandler {
 #[derive(Clone, Debug)]
 pub(crate) struct ProtocolState {
     pub(crate) events: mpsc::UnboundedSender<ProtocolEvent>,
+    pub(crate) to_peers: tokio::sync::broadcast::Sender<SignedTicker>,
 }
 
 /// The events that can be emitted by our custom protocol.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum ProtocolEvent {
     Established {
         direction: Direction,

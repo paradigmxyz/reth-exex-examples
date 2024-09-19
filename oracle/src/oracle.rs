@@ -27,8 +27,8 @@ pub(crate) struct Oracle<Node: FullNodeComponents> {
     data_feed: DataFeederStream,
     /// The signer to sign the data feed.
     signer: PrivateKeySigner,
-    /// Half of the broadcast channel to send data to gossip.
-    to_gossip: tokio::sync::broadcast::Sender<SignedTicker>,
+    /// Half of the broadcast channel to send data to connected peers.
+    to_peers: tokio::sync::broadcast::Sender<SignedTicker>,
 }
 
 impl<Node: FullNodeComponents> Oracle<Node> {
@@ -36,9 +36,9 @@ impl<Node: FullNodeComponents> Oracle<Node> {
         exex: ExEx<Node>,
         network: OracleNetwork,
         data_feed: DataFeederStream,
-        to_gossip: tokio::sync::broadcast::Sender<SignedTicker>,
+        to_peers: tokio::sync::broadcast::Sender<SignedTicker>,
     ) -> Self {
-        Self { exex, network, data_feed, signer: PrivateKeySigner::random(), to_gossip }
+        Self { exex, network, data_feed, signer: PrivateKeySigner::random(), to_peers }
     }
 }
 
@@ -74,8 +74,8 @@ impl<Node: FullNodeComponents> Future for Oracle<Node> {
                     let signature = this.signer.sign_message_sync(&buffer)?;
                     let signed_ticker = SignedTicker::new(ticker, signature, this.signer.address());
 
-                    if let Err(err) = this.to_gossip.send(signed_ticker.clone()) {
-                        error!(?err, "Failed to send ticker to gossip");
+                    if let Err(err) = this.to_peers.send(signed_ticker.clone()) {
+                        error!(?err, "Failed to send ticker to gossip, no peers connected");
                     }
                 }
                 Some(Err(e)) => {

@@ -1,7 +1,6 @@
 use discovery::Discovery;
 use futures::FutureExt;
-use gossip::Gossip;
-use proto::{data::SignedTicker, ProtocolEvent};
+use proto::ProtocolEvent;
 use reth_tracing::tracing::{error, info};
 use std::{
     future::Future,
@@ -9,10 +8,8 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::sync::broadcast::Sender;
 
 mod discovery;
-mod gossip;
 pub(crate) mod proto;
 
 /// The OracleNetwork struct is a long running task that orchestrates discovery of new peers and
@@ -22,8 +19,6 @@ pub(crate) struct OracleNetwork {
     discovery: Discovery,
     /// The protocol events channel.
     proto_events: proto::ProtoEvents,
-    /// Helper struct to manage gossiping data to connected peers.
-    gossip: Gossip,
 }
 
 impl OracleNetwork {
@@ -31,12 +26,11 @@ impl OracleNetwork {
         proto_events: proto::ProtoEvents,
         tcp_port: u16,
         udp_port: u16,
-    ) -> eyre::Result<(Self, Sender<SignedTicker>)> {
+    ) -> eyre::Result<Self> {
         let disc_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), udp_port);
         let rlpx_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), tcp_port);
         let discovery = Discovery::new(disc_addr, rlpx_addr).await?;
-        let (gossip, to_gossip) = Gossip::new();
-        Ok((Self { discovery, proto_events, gossip }, to_gossip))
+        Ok(Self { discovery, proto_events })
     }
 }
 
@@ -72,7 +66,6 @@ impl Future for OracleNetwork {
                         ?to_connection,
                         "Established connection, will start gossiping"
                     );
-                    this.gossip.start(to_connection)?;
                 }
                 Poll::Ready(None) => {
                     return Poll::Pending;

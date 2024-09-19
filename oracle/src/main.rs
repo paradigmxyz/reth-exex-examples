@@ -25,7 +25,7 @@ fn main() -> eyre::Result<()> {
             .node(EthereumNode::default())
             .install_exex(ORACLE_EXEX_ID, move |ctx| async move {
                 // define the oracle subprotocol
-                let (subproto, proto_events) = OracleProtoHandler::new();
+                let (subproto, proto_events, to_peers) = OracleProtoHandler::new();
                 // add it to the network as a subprotocol
                 ctx.network().add_rlpx_sub_protocol(subproto.into_rlpx_sub_protocol());
 
@@ -34,8 +34,7 @@ fn main() -> eyre::Result<()> {
 
                 // the instance of the oracle network that will handle discovery and
                 // gossiping of data
-                let (network, to_gossip) =
-                    OracleNetwork::new(proto_events, tcp_port, udp_port).await?;
+                let network = OracleNetwork::new(proto_events, tcp_port, udp_port).await?;
                 // the off-chain data feed stream
                 let data_feed = DataFeederStream::new(args.binance_symbols).await?;
 
@@ -43,7 +42,7 @@ fn main() -> eyre::Result<()> {
                 // the offchain data stream and the gossiping
                 // the oracle will always sign and broadcast data via the channel until a peer is
                 // subcribed to it
-                let oracle = Oracle::new(exex, network, data_feed, to_gossip);
+                let oracle = Oracle::new(exex, network, data_feed, to_peers);
                 Ok(oracle)
             })
             .launch()
