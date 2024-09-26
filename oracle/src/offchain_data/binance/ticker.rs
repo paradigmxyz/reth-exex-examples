@@ -11,7 +11,9 @@ pub(crate) struct BinanceResponse {
 }
 
 /// Binance ticker data
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
+#[derive(
+    Serialize, Deserialize, Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable, Default,
+)]
 pub(crate) struct Ticker {
     /// Event type (e.g., "24hrTicker")
     #[serde(rename = "e")]

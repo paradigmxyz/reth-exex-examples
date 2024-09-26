@@ -6,7 +6,7 @@ use data::SignedTicker;
 use reth_eth_wire::{protocol::Protocol, Capability};
 use reth_network::{protocol::ProtocolHandler, Direction};
 use reth_network_api::PeerId;
-use reth_primitives::{Buf, BufMut, BytesMut};
+use reth_primitives::{Address, Buf, BufMut, BytesMut};
 use std::net::SocketAddr;
 use tokio::sync::mpsc;
 
@@ -19,6 +19,7 @@ pub(crate) enum OracleProtoMessageId {
     Ping = 0x00,
     Pong = 0x01,
     TickData = 0x02,
+    Attestations = 0x03,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -26,6 +27,7 @@ pub(crate) enum OracleProtoMessageKind {
     Ping,
     Pong,
     SignedTicker(Box<SignedTicker>),
+    Attestations(Vec<Address>),
 }
 
 #[derive(Clone, Debug)]
@@ -45,11 +47,19 @@ impl OracleProtoMessage {
         Protocol::new(Self::capability(), 4)
     }
 
+    /// Creates an attestations message
+    pub(crate) fn attestations(attestations: Vec<Address>) -> Self {
+        Self {
+            message_type: OracleProtoMessageId::Attestations,
+            message: OracleProtoMessageKind::Attestations(attestations),
+        }
+    }
+
     /// Creates a signed ticker message
-    pub(crate) fn signed_ticker(data: SignedTicker) -> Self {
+    pub(crate) fn signed_ticker(data: Box<SignedTicker>) -> Self {
         Self {
             message_type: OracleProtoMessageId::TickData,
-            message: OracleProtoMessageKind::SignedTicker(Box::new(data)),
+            message: OracleProtoMessageKind::SignedTicker(data),
         }
     }
 
@@ -69,6 +79,9 @@ impl OracleProtoMessage {
         buf.put_u8(self.message_type as u8);
         match &self.message {
             OracleProtoMessageKind::Ping | OracleProtoMessageKind::Pong => {}
+            OracleProtoMessageKind::Attestations(data) => {
+                data.encode(&mut buf);
+            }
             OracleProtoMessageKind::SignedTicker(data) => {
                 data.encode(&mut buf);
             }
@@ -87,11 +100,16 @@ impl OracleProtoMessage {
             0x00 => OracleProtoMessageId::Ping,
             0x01 => OracleProtoMessageId::Pong,
             0x02 => OracleProtoMessageId::TickData,
+            0x03 => OracleProtoMessageId::Attestations,
             _ => return None,
         };
         let message = match message_type {
             OracleProtoMessageId::Ping => OracleProtoMessageKind::Ping,
             OracleProtoMessageId::Pong => OracleProtoMessageKind::Pong,
+            OracleProtoMessageId::Attestations => {
+                let data = Vec::<Address>::decode(buf).ok()?;
+                OracleProtoMessageKind::Attestations(data)
+            }
             OracleProtoMessageId::TickData => {
                 let data = SignedTicker::decode(buf).ok()?;
                 OracleProtoMessageKind::SignedTicker(Box::new(data))
@@ -172,7 +190,106 @@ mod tests {
     use crate::offchain_data::binance::ticker::Ticker;
     use alloy_signer::SignerSync;
     use alloy_signer_local::PrivateKeySigner;
+    use mpsc::{UnboundedReceiver, UnboundedSender};
+    use reth::providers::test_utils::MockEthProvider;
+    use reth_network::test_utils::Testnet;
+    use reth_primitives::B256;
+    use tokio::sync::oneshot;
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn can_attest_multiple_times() {
+        reth_tracing::init_test_tracing();
+        let provider = MockEthProvider::default();
+        let mut net = Testnet::create_with(2, provider.clone()).await;
+
+        let (events, mut from_peer0) = mpsc::unbounded_channel();
+        let (to_peer0, mut broadcast_from_peer0) =
+            tokio::sync::broadcast::channel(BROADCAST_CHANNEL_SIZE);
+        net.peers_mut()[0].add_rlpx_sub_protocol(OracleProtoHandler {
+            state: ProtocolState { events, to_peers: to_peer0.clone() },
+        });
+
+        let (events, mut from_peer1) = mpsc::unbounded_channel();
+        let (to_peer1, mut broadcast_from_peer1) =
+            tokio::sync::broadcast::channel(BROADCAST_CHANNEL_SIZE);
+        net.peers_mut()[1].add_rlpx_sub_protocol(OracleProtoHandler {
+            state: ProtocolState { events, to_peers: to_peer1.clone() },
+        });
+
+        let handle = net.spawn();
+
+        handle.connect_peers().await;
+
+        let peer0_conn = established(&mut from_peer0, *handle.peers()[1].peer_id()).await;
+        let peer1_conn = established(&mut from_peer1, *handle.peers()[0].peer_id()).await;
+
+        let (peer0_att, _, broadcast_from_peer0) =
+            sent_att(&to_peer0, &mut broadcast_from_peer0).await;
+        got_att(peer0_conn.clone(), peer0_att.id, peer0_att.signer, 1).await;
+
+        let (peer1_att, _, _) = sent_att(&to_peer1, &mut broadcast_from_peer1).await;
+        got_att(peer1_conn.clone(), peer1_att.id, peer1_att.signer, 1).await;
+
+        let (att, _to_peer0, _broad_cast_from_peer0) =
+            sent_att(&to_peer0, broadcast_from_peer0).await;
+        got_att(peer0_conn, att.id, att.signer, 2).await;
+    }
+
+    async fn established(
+        from_peer0: &mut UnboundedReceiver<ProtocolEvent>,
+        wanted: PeerId,
+    ) -> UnboundedSender<OracleCommand> {
+        let peer0_to_peer1 = from_peer0.recv().await.unwrap();
+        match peer0_to_peer1 {
+            ProtocolEvent::Established { direction: _, peer_id, to_connection } => {
+                assert_eq!(wanted, peer_id);
+                to_connection
+            }
+        }
+    }
+    async fn got_att(
+        connection: UnboundedSender<OracleCommand>,
+        attestation_id: B256,
+        expected_signer: Address,
+        expcted_att_len: usize,
+    ) {
+        let (tx, rx) = oneshot::channel();
+
+        connection.send(OracleCommand::Attestation(attestation_id, tx)).unwrap();
+
+        let response = rx.await.unwrap();
+        assert_eq!(response.len(), expcted_att_len);
+        assert_eq!(response[expcted_att_len - 1], expected_signer);
+    }
+
+    async fn sent_att<'a>(
+        to_peer: &'a tokio::sync::broadcast::Sender<SignedTicker>,
+        broadcast_from_peer: &'a mut tokio::sync::broadcast::Receiver<SignedTicker>,
+    ) -> (
+        SignedTicker,
+        &'a tokio::sync::broadcast::Sender<SignedTicker>,
+        &'a mut tokio::sync::broadcast::Receiver<SignedTicker>,
+    ) {
+        // Create a new signer and sign the ticker data
+        let signer = PrivateKeySigner::random();
+        let signer_address = signer.address();
+        let ticker_data = mock_ticker();
+        let mut buffer = BytesMut::new();
+        ticker_data.encode(&mut buffer);
+        let signature = signer.sign_message_sync(&buffer).unwrap();
+
+        // Create the signed ticker
+        let signed_ticker = SignedTicker::new(ticker_data, signature, signer_address);
+
+        // Send the signed ticker to the peer
+        to_peer.send(signed_ticker.clone()).unwrap();
+
+        // Expect it in the broadcast receiver
+        let received = broadcast_from_peer.recv().await.unwrap();
+        assert_eq!(received, signed_ticker);
+
+        (signed_ticker, to_peer, broadcast_from_peer)
+    }
     #[test]
     fn can_decode_msg() {
         test_msg(OracleProtoMessage::ping());

@@ -28,7 +28,7 @@ reth-execution-types = { git = "https://github.com/paradigmxyz/reth" }
 reth-exex = { git = "https://github.com/paradigmxyz/reth", features = ["serde"] }
 reth-eth-wire = { git = "https://github.com/paradigmxyz/reth" }
 reth-evm = { git = "https://github.com/paradigmxyz/reth" }
-reth-network = { git = "https://github.com/paradigmxyz/reth" }
+reth-network = { git = "https://github.com/paradigmxyz/reth", features = ["test-utils"] }
 reth-network-api = { git = "https://github.com/paradigmxyz/reth" }
 reth-network-peers = { git = "https://github.com/paradigmxyz/reth" }
 reth-node-api = { git = "https://github.com/paradigmxyz/reth" }

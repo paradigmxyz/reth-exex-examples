@@ -2,26 +2,28 @@ use super::{
     data::SignedTicker, OracleProtoMessage, OracleProtoMessageKind, ProtocolEvent, ProtocolState,
 };
 use alloy_rlp::Encodable;
+use dashmap::DashMap;
 use futures::{Stream, StreamExt};
 use reth_eth_wire::{
     capability::SharedCapabilities, multiplex::ProtocolConnection, protocol::Protocol,
 };
 use reth_network::protocol::{ConnectionHandler, OnNotSupported};
 use reth_network_api::Direction;
-use reth_primitives::{Address, BytesMut};
+use reth_primitives::{Address, BytesMut, B256};
 use reth_rpc_types::PeerId;
 use std::{
     pin::Pin,
     task::{ready, Context, Poll},
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
 
 /// The commands supported by the OracleConnection.
-#[derive(Clone)]
 pub(crate) enum OracleCommand {
     /// Sends a signed tick to a peer
-    Tick(SignedTicker),
+    Tick(Box<SignedTicker>),
+    /// Requests for attestations from a given id
+    Attestation(B256, oneshot::Sender<Vec<Address>>),
 }
 
 /// This struct defines the connection object for the Oracle subprotocol.
@@ -30,7 +32,8 @@ pub(crate) struct OracleConnection {
     commands: UnboundedReceiverStream<OracleCommand>,
     signed_ticks: BroadcastStream<SignedTicker>,
     initial_ping: Option<OracleProtoMessage>,
-    attestations: Vec<Address>,
+    attestations: DashMap<B256, Vec<Address>>,
+    pending_response: Option<oneshot::Sender<Vec<Address>>>,
 }
 
 impl Stream for OracleConnection {
@@ -49,11 +52,22 @@ impl Stream for OracleConnection {
                     OracleCommand::Tick(tick) => {
                         Poll::Ready(Some(OracleProtoMessage::signed_ticker(tick).encoded()))
                     }
+                    OracleCommand::Attestation(id, pending_response) => {
+                        let attestations =
+                            this.attestations.get(&id).map(|a| a.clone()).unwrap_or_default();
+
+                        this.pending_response = Some(pending_response);
+                        return Poll::Ready(Some(
+                            OracleProtoMessage::attestations(attestations).encoded(),
+                        ));
+                    }
                 };
             }
 
             if let Poll::Ready(Some(Ok(tick))) = this.signed_ticks.poll_next_unpin(cx) {
-                return Poll::Ready(Some(OracleProtoMessage::signed_ticker(tick).encoded()));
+                return Poll::Ready(Some(
+                    OracleProtoMessage::signed_ticker(Box::new(tick)).encoded(),
+                ));
             }
 
             let Some(msg) = ready!(this.conn.poll_next_unpin(cx)) else { return Poll::Ready(None) };
@@ -67,6 +81,11 @@ impl Stream for OracleConnection {
                     return Poll::Ready(Some(OracleProtoMessage::pong().encoded()))
                 }
                 OracleProtoMessageKind::Pong => {}
+                OracleProtoMessageKind::Attestations(attestations) => {
+                    if let Some(sender) = this.pending_response.take() {
+                        sender.send(attestations).ok();
+                    }
+                }
                 OracleProtoMessageKind::SignedTicker(signed_data) => {
                     let signer = signed_data.signer;
                     let sig = signed_data.signature;
@@ -74,11 +93,25 @@ impl Stream for OracleConnection {
                     let mut buffer = BytesMut::new();
                     signed_data.ticker.encode(&mut buffer);
 
-                    let addr = sig.recover_address_from_msg(buffer).ok().unwrap();
+                    let addr = match sig.recover_address_from_msg(buffer.clone()) {
+                        Ok(addr) => addr,
+                        Err(_) => return Poll::Ready(None),
+                    };
 
-                    if addr == signer && !this.attestations.contains(&addr) {
-                        this.attestations.push(addr);
+                    if addr == signer {
+                        this.attestations
+                            .entry(signed_data.id)
+                            .and_modify(|vec| vec.push(addr))
+                            .or_insert_with(|| vec![addr]);
                     }
+                    let attestations = this
+                        .attestations
+                        .get(&signed_data.id)
+                        .map(|a| a.clone())
+                        .unwrap_or_default();
+                    return Poll::Ready(Some(
+                        OracleProtoMessage::attestations(attestations).encoded(),
+                    ));
                 }
             }
         }
@@ -122,7 +155,8 @@ impl ConnectionHandler for OracleConnHandler {
             initial_ping: direction.is_outgoing().then(OracleProtoMessage::ping),
             commands: UnboundedReceiverStream::new(rx),
             signed_ticks: BroadcastStream::new(self.state.to_peers.subscribe()),
-            attestations: Vec::new(),
+            attestations: DashMap::new(),
+            pending_response: None,
         }
     }
 }

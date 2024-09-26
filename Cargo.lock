@@ -4241,6 +4241,7 @@ dependencies = [
  "alloy-signer",
  "alloy-signer-local",
  "clap",
+ "dashmap",
  "discv5 0.7.0",
  "enr",
  "eyre",
@@ -4265,6 +4266,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite",
+ "uuid",
 ]
 
 [[package]]
@@ -6226,6 +6228,7 @@ dependencies = [
  "reth-network-peers",
  "reth-network-types",
  "reth-primitives",
+ "reth-provider",
  "reth-storage-api",
  "reth-tasks",
  "reth-tokio-util",
@@ -6235,6 +6238,7 @@ dependencies = [
  "secp256k1",
  "serde",
  "smallvec",
+ "tempfile",
  "thiserror",
  "tokio",
  "tokio-stream",
