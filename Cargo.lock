@@ -4237,6 +4237,9 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 name = "oracle"
 version = "0.1.0"
 dependencies = [
+ "alloy-rlp",
+ "alloy-signer",
+ "alloy-signer-local",
  "clap",
  "discv5 0.7.0",
  "enr",
@@ -4246,6 +4249,7 @@ dependencies = [
  "reth-discv5",
  "reth-eth-wire",
  "reth-exex",
+ "reth-exex-test-utils",
  "reth-network",
  "reth-network-api",
  "reth-network-peers",
@@ -4253,9 +4257,15 @@ dependencies = [
  "reth-node-ethereum",
  "reth-primitives",
  "reth-rpc-types",
+ "reth-testing-utils",
  "reth-tracing",
+ "serde",
+ "serde_json",
+ "thiserror",
  "tokio",
  "tokio-stream",
+ "tokio-tungstenite",
+ "uuid",
 ]
 
 [[package]]
@@ -6217,6 +6227,7 @@ dependencies = [
  "reth-network-peers",
  "reth-network-types",
  "reth-primitives",
+ "reth-provider",
  "reth-storage-api",
  "reth-tasks",
  "reth-tokio-util",
@@ -6226,6 +6237,7 @@ dependencies = [
  "secp256k1",
  "serde",
  "smallvec",
+ "tempfile",
  "thiserror",
  "tokio",
  "tokio-stream",

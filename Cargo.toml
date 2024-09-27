@@ -28,7 +28,7 @@ reth-execution-types = { git = "https://github.com/paradigmxyz/reth" }
 reth-exex = { git = "https://github.com/paradigmxyz/reth", features = ["serde"] }
 reth-eth-wire = { git = "https://github.com/paradigmxyz/reth" }
 reth-evm = { git = "https://github.com/paradigmxyz/reth" }
-reth-network = { git = "https://github.com/paradigmxyz/reth" }
+reth-network = { git = "https://github.com/paradigmxyz/reth", features = ["test-utils"] }
 reth-network-api = { git = "https://github.com/paradigmxyz/reth" }
 reth-network-peers = { git = "https://github.com/paradigmxyz/reth" }
 reth-node-api = { git = "https://github.com/paradigmxyz/reth" }
@@ -43,12 +43,19 @@ reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
 
 # alloy
 alloy-sol-types = { version = "0.8", features = ["json"] }
+alloy-signer-local = "0.3"
+alloy-signer = "0.3"
+alloy-rlp = "0.3"
 
 # async
 futures = "0.3"
 futures-util = "0.3"
 tokio = { version = "1.0", features = ["full"] }
 tokio-stream = "0.1"
+
+# serde
+serde = "1"
+serde_json = "1"
 
 # misc
 eyre = "0.6"

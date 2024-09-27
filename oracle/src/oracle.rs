@@ -1,4 +1,12 @@
-use futures::FutureExt;
+use crate::{
+    exex::ExEx,
+    network::{proto::data::SignedTicker, OracleNetwork},
+    offchain_data::{DataFeederStream, DataFeeds},
+};
+use alloy_rlp::{BytesMut, Encodable};
+use alloy_signer::SignerSync;
+use alloy_signer_local::PrivateKeySigner;
+use futures::{FutureExt, StreamExt};
 use reth_node_api::FullNodeComponents;
 use reth_tracing::tracing::{error, info};
 use std::{
@@ -7,21 +15,30 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{exex::ExEx, network::Network};
-
 /// The Oracle struct is a long running task that orchestrates discovery of new peers,
 /// decoding data from chain events (ExEx) and gossiping it to peers.
 pub(crate) struct Oracle<Node: FullNodeComponents> {
     /// The network task for this node.
     /// It is composed by a discovery task and a sub protocol RLPx task.
-    network: Network,
+    network: OracleNetwork,
     /// The execution extension task for this node.
     exex: ExEx<Node>,
+    /// The offchain data feed stream.
+    data_feed: DataFeederStream,
+    /// The signer to sign the data feed.
+    signer: PrivateKeySigner,
+    /// Half of the broadcast channel to send data to connected peers.
+    to_peers: tokio::sync::broadcast::Sender<SignedTicker>,
 }
 
 impl<Node: FullNodeComponents> Oracle<Node> {
-    pub(crate) async fn new(exex: ExEx<Node>, network: Network) -> eyre::Result<Self> {
-        Ok(Self { exex, network })
+    pub(crate) fn new(
+        exex: ExEx<Node>,
+        network: OracleNetwork,
+        data_feed: DataFeederStream,
+        to_peers: tokio::sync::broadcast::Sender<SignedTicker>,
+    ) -> Self {
+        Self { exex, network, data_feed, signer: PrivateKeySigner::random(), to_peers }
     }
 }
 
@@ -44,6 +61,28 @@ impl<Node: FullNodeComponents> Future for Oracle<Node> {
                     // Exit match and continue to poll exex
                     break;
                 }
+            }
+        }
+
+        // Poll the data feed future until it's drained
+        while let Poll::Ready(item) = this.data_feed.poll_next_unpin(cx) {
+            match item {
+                Some(Ok(ticker_data)) => {
+                    let DataFeeds::Binance(ticker) = ticker_data;
+                    let mut buffer = BytesMut::new();
+                    ticker.encode(&mut buffer);
+                    let signature = this.signer.sign_message_sync(&buffer)?;
+                    let signed_ticker = SignedTicker::new(ticker, signature, this.signer.address());
+
+                    if let Err(err) = this.to_peers.send(signed_ticker.clone()) {
+                        error!(?err, "Failed to send ticker to gossip, no peers connected");
+                    }
+                }
+                Some(Err(e)) => {
+                    error!(?e, "Data feed task encountered an error");
+                    return Poll::Ready(Err(e.into()));
+                }
+                None => break,
             }
         }
 

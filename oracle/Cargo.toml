@@ -22,6 +22,10 @@ reth-rpc-types.workspace = true
 reth-tracing.workspace = true
 reth.workspace = true
 
+alloy-signer-local.workspace = true
+alloy-signer.workspace = true
+alloy-rlp.workspace = true
+
 # networking
 discv5 = "0.7"
 enr = "0.12"
@@ -30,7 +34,17 @@ enr = "0.12"
 futures.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
+tokio-tungstenite = "0.23"
+
+
+thiserror = "1"
 
 # misc
 clap = "4" 
 eyre.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid = "1.10.0"
+
+reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth" }
+reth-testing-utils = { git = "https://github.com/paradigmxyz/reth" }

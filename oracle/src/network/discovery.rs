@@ -67,11 +67,11 @@ impl Future for Discovery {
             match ready!(this.events.poll_recv(cx)) {
                 Some(evt) => match evt {
                     Event::Discovered(enr) => {
-                        info!(?enr, "Discovered a new peer.");
+                        info!(?enr, "Discovered a new node.");
                         this.add_node(enr)?;
                     }
                     Event::SessionEstablished(enr, socket_addr) => {
-                        info!(?enr, ?socket_addr, "Session established with a new peer.");
+                        info!(?enr, ?socket_addr, "Session established with a new node.");
                     }
                     evt => {
                         info!(?evt, "New discovery event.");

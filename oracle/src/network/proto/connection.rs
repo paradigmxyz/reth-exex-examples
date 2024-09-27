@@ -1,35 +1,43 @@
-use super::{OracleProtoMessage, OracleProtoMessageKind, ProtocolEvent, ProtocolState};
+use super::{
+    data::SignedTicker, OracleProtoMessage, OracleProtoMessageKind, ProtocolEvent, ProtocolState,
+};
+use alloy_rlp::Encodable;
 use futures::{Stream, StreamExt};
 use reth_eth_wire::{
     capability::SharedCapabilities, multiplex::ProtocolConnection, protocol::Protocol,
 };
 use reth_network::protocol::{ConnectionHandler, OnNotSupported};
 use reth_network_api::Direction;
-use reth_primitives::BytesMut;
+use reth_primitives::{Address, BytesMut, B256};
 use reth_rpc_types::PeerId;
 use std::{
+    collections::HashMap,
     pin::Pin,
     task::{ready, Context, Poll},
 };
 use tokio::sync::{mpsc, oneshot};
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
 
 /// The commands supported by the OracleConnection.
 pub(crate) enum OracleCommand {
-    /// Sends a message to the peer
-    Message {
-        msg: String,
-        /// The response will be sent to this channel.
-        response: oneshot::Sender<String>,
-    },
+    /// A peer can request the attestations for a specific tick data.
+    Attestation(B256, oneshot::Sender<Vec<Address>>),
 }
 
 /// This struct defines the connection object for the Oracle subprotocol.
 pub(crate) struct OracleConnection {
+    /// The connection channel receiving RLP bytes from the network.
     conn: ProtocolConnection,
+    /// The channel to receive commands from the Oracle network.
     commands: UnboundedReceiverStream<OracleCommand>,
-    pending_pong: Option<oneshot::Sender<String>>,
+    /// The channel to receive signed ticks from the Oracle network.
+    signed_ticks: BroadcastStream<SignedTicker>,
+    /// The initial ping message to send to the peer.
     initial_ping: Option<OracleProtoMessage>,
+    /// The attestations received from the peer.
+    attestations: HashMap<B256, Vec<Address>>,
+    /// The pending attestation channel to send back attestations to who requested them.
+    pending_att: Option<oneshot::Sender<Vec<Address>>>,
 }
 
 impl Stream for OracleConnection {
@@ -44,12 +52,16 @@ impl Stream for OracleConnection {
 
         loop {
             if let Poll::Ready(Some(cmd)) = this.commands.poll_next_unpin(cx) {
-                return match cmd {
-                    OracleCommand::Message { msg, response } => {
-                        this.pending_pong = Some(response);
-                        Poll::Ready(Some(OracleProtoMessage::ping_message(msg).encoded()))
-                    }
-                };
+                let OracleCommand::Attestation(id, pending_att) = cmd;
+                let attestations = this.attestations.get(&id).cloned().unwrap_or_default();
+                this.pending_att = Some(pending_att);
+                return Poll::Ready(Some(OracleProtoMessage::attestations(attestations).encoded()));
+            }
+
+            if let Poll::Ready(Some(Ok(tick))) = this.signed_ticks.poll_next_unpin(cx) {
+                return Poll::Ready(Some(
+                    OracleProtoMessage::signed_ticker(Box::new(tick)).encoded(),
+                ));
             }
 
             let Some(msg) = ready!(this.conn.poll_next_unpin(cx)) else { return Poll::Ready(None) };
@@ -63,18 +75,37 @@ impl Stream for OracleConnection {
                     return Poll::Ready(Some(OracleProtoMessage::pong().encoded()))
                 }
                 OracleProtoMessageKind::Pong => {}
-                OracleProtoMessageKind::PingMessage(msg) => {
-                    return Poll::Ready(Some(OracleProtoMessage::pong_message(msg).encoded()))
-                }
-                OracleProtoMessageKind::PongMessage(msg) => {
-                    if let Some(sender) = this.pending_pong.take() {
-                        sender.send(msg).ok();
+                OracleProtoMessageKind::Attestations(attestations) => {
+                    if let Some(sender) = this.pending_att.take() {
+                        sender.send(attestations).ok();
                     }
-                    continue;
+                }
+                OracleProtoMessageKind::SignedTicker(signed_data) => {
+                    let signer = signed_data.signer;
+                    let sig = signed_data.signature;
+
+                    let mut buffer = BytesMut::new();
+                    signed_data.ticker.encode(&mut buffer);
+
+                    let addr = match sig.recover_address_from_msg(buffer.clone()) {
+                        Ok(addr) => addr,
+                        Err(_) => return Poll::Ready(None),
+                    };
+
+                    if addr == signer {
+                        this.attestations
+                            .entry(signed_data.id)
+                            .and_modify(|vec| vec.push(addr))
+                            .or_insert_with(|| vec![addr]);
+                    }
+
+                    let attestations =
+                        this.attestations.get(&signed_data.id).cloned().unwrap_or_default();
+                    return Poll::Ready(Some(
+                        OracleProtoMessage::attestations(attestations).encoded(),
+                    ));
                 }
             }
-
-            return Poll::Pending;
         }
     }
 }
@@ -115,7 +146,9 @@ impl ConnectionHandler for OracleConnHandler {
             conn,
             initial_ping: direction.is_outgoing().then(OracleProtoMessage::ping),
             commands: UnboundedReceiverStream::new(rx),
-            pending_pong: None,
+            signed_ticks: BroadcastStream::new(self.state.to_peers.subscribe()),
+            attestations: HashMap::new(),
+            pending_att: None,
         }
     }
 }
