@@ -2,7 +2,6 @@ use super::{
     data::SignedTicker, OracleProtoMessage, OracleProtoMessageKind, ProtocolEvent, ProtocolState,
 };
 use alloy_rlp::Encodable;
-use dashmap::DashMap;
 use futures::{Stream, StreamExt};
 use reth_eth_wire::{
     capability::SharedCapabilities, multiplex::ProtocolConnection, protocol::Protocol,
@@ -12,6 +11,7 @@ use reth_network_api::Direction;
 use reth_primitives::{Address, BytesMut, B256};
 use reth_rpc_types::PeerId;
 use std::{
+    collections::HashMap,
     pin::Pin,
     task::{ready, Context, Poll},
 };
@@ -20,20 +20,24 @@ use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
 
 /// The commands supported by the OracleConnection.
 pub(crate) enum OracleCommand {
-    /// Sends a signed tick to a peer
-    Tick(Box<SignedTicker>),
-    /// Requests for attestations from a given id
+    /// A peer can request the attestations for a specific tick data.
     Attestation(B256, oneshot::Sender<Vec<Address>>),
 }
 
 /// This struct defines the connection object for the Oracle subprotocol.
 pub(crate) struct OracleConnection {
+    /// The connection channel receiving RLP bytes from the network.
     conn: ProtocolConnection,
+    /// The channel to receive commands from the Oracle network.
     commands: UnboundedReceiverStream<OracleCommand>,
+    /// The channel to receive signed ticks from the Oracle network.
     signed_ticks: BroadcastStream<SignedTicker>,
+    /// The initial ping message to send to the peer.
     initial_ping: Option<OracleProtoMessage>,
-    attestations: DashMap<B256, Vec<Address>>,
-    pending_response: Option<oneshot::Sender<Vec<Address>>>,
+    /// The attestations received from the peer.
+    attestations: HashMap<B256, Vec<Address>>,
+    /// The pending attestation channel to send back attestations to who requested them.
+    pending_att: Option<oneshot::Sender<Vec<Address>>>,
 }
 
 impl Stream for OracleConnection {
@@ -48,20 +52,10 @@ impl Stream for OracleConnection {
 
         loop {
             if let Poll::Ready(Some(cmd)) = this.commands.poll_next_unpin(cx) {
-                return match cmd {
-                    OracleCommand::Tick(tick) => {
-                        Poll::Ready(Some(OracleProtoMessage::signed_ticker(tick).encoded()))
-                    }
-                    OracleCommand::Attestation(id, pending_response) => {
-                        let attestations =
-                            this.attestations.get(&id).map(|a| a.clone()).unwrap_or_default();
-
-                        this.pending_response = Some(pending_response);
-                        return Poll::Ready(Some(
-                            OracleProtoMessage::attestations(attestations).encoded(),
-                        ));
-                    }
-                };
+                let OracleCommand::Attestation(id, pending_att) = cmd;
+                let attestations = this.attestations.get(&id).cloned().unwrap_or_default();
+                this.pending_att = Some(pending_att);
+                return Poll::Ready(Some(OracleProtoMessage::attestations(attestations).encoded()));
             }
 
             if let Poll::Ready(Some(Ok(tick))) = this.signed_ticks.poll_next_unpin(cx) {
@@ -82,7 +76,7 @@ impl Stream for OracleConnection {
                 }
                 OracleProtoMessageKind::Pong => {}
                 OracleProtoMessageKind::Attestations(attestations) => {
-                    if let Some(sender) = this.pending_response.take() {
+                    if let Some(sender) = this.pending_att.take() {
                         sender.send(attestations).ok();
                     }
                 }
@@ -104,11 +98,9 @@ impl Stream for OracleConnection {
                             .and_modify(|vec| vec.push(addr))
                             .or_insert_with(|| vec![addr]);
                     }
-                    let attestations = this
-                        .attestations
-                        .get(&signed_data.id)
-                        .map(|a| a.clone())
-                        .unwrap_or_default();
+
+                    let attestations =
+                        this.attestations.get(&signed_data.id).cloned().unwrap_or_default();
                     return Poll::Ready(Some(
                         OracleProtoMessage::attestations(attestations).encoded(),
                     ));
@@ -155,8 +147,8 @@ impl ConnectionHandler for OracleConnHandler {
             initial_ping: direction.is_outgoing().then(OracleProtoMessage::ping),
             commands: UnboundedReceiverStream::new(rx),
             signed_ticks: BroadcastStream::new(self.state.to_peers.subscribe()),
-            attestations: DashMap::new(),
-            pending_response: None,
+            attestations: HashMap::new(),
+            pending_att: None,
         }
     }
 }

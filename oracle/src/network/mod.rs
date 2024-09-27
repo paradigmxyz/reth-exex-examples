@@ -1,5 +1,5 @@
 use discovery::Discovery;
-use futures::FutureExt;
+use futures::{ready, FutureExt};
 use proto::ProtocolEvent;
 use reth_tracing::tracing::{error, info};
 use std::{
@@ -52,14 +52,9 @@ impl Future for OracleNetwork {
                 Poll::Pending => break,
             }
         }
-
         loop {
-            match this.proto_events.poll_recv(cx) {
-                Poll::Ready(Some(ProtocolEvent::Established {
-                    direction,
-                    peer_id,
-                    to_connection,
-                })) => {
+            match ready!(this.proto_events.poll_recv(cx)) {
+                Some(ProtocolEvent::Established { direction, peer_id, to_connection }) => {
                     info!(
                         ?direction,
                         ?peer_id,
@@ -67,13 +62,7 @@ impl Future for OracleNetwork {
                         "Established connection, will start gossiping"
                     );
                 }
-                Poll::Ready(None) => {
-                    return Poll::Pending;
-                }
-
-                Poll::Pending => {
-                    return Poll::Pending;
-                }
+                None => return Poll::Ready(Ok(())),
             }
         }
     }

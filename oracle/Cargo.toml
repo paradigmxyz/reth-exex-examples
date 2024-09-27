@@ -45,7 +45,6 @@ eyre.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid = "1.10.0"
-dashmap = "6.1.0"
 
 reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth" }
 reth-testing-utils = { git = "https://github.com/paradigmxyz/reth" }

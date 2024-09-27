@@ -4241,7 +4241,6 @@ dependencies = [
  "alloy-signer",
  "alloy-signer-local",
  "clap",
- "dashmap",
  "discv5 0.7.0",
  "enr",
  "eyre",
