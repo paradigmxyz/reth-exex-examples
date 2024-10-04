@@ -1,10 +1,11 @@
+use alloy_primitives::{address, Address};
 use alloy_sol_types::{sol, SolEventInterface};
-use futures::{Future, StreamExt};
+use futures::{Future, FutureExt, StreamExt};
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
-use reth_primitives::{address, Address, Log, SealedBlockWithSenders, TransactionSigned};
+use reth_primitives::{Log, SealedBlockWithSenders, TransactionSigned};
 use reth_tracing::tracing::info;
 use rusqlite::Connection;
 
@@ -218,7 +219,7 @@ fn decode_chain_into_events(
         .flat_map(|(block, receipts)| {
             block
                 .body
-                .iter()
+                .transactions()
                 .zip(receipts.iter().flatten())
                 .map(move |(tx, receipt)| (block, tx, receipt))
         })
@@ -242,9 +243,23 @@ fn main() -> eyre::Result<()> {
     reth::cli::Cli::parse_args().run(|builder, _| async move {
         let handle = builder
             .node(EthereumNode::default())
-            .install_exex("OPBridge", |ctx| async move {
-                let connection = Connection::open("op_bridge.db")?;
-                init(ctx, connection).await
+            .install_exex("OPBridge", move |ctx| {
+                // Rust seems to trigger a bogus higher-ranked lifetime error when using
+                // just an async closure here -- using `spawn_blocking` avoids this
+                // particular issue.
+                //
+                // To avoid the higher ranked lifetime error we use `spawn_blocking`
+                // which will move the closure to another blocking-allowed thread,
+                // then execute.
+                //
+                // Source: https://github.com/vados-cosmonic/wasmCloud/commit/440e8c377f6b02f45eacb02692e4d2fabd53a0ec
+                tokio::task::spawn_blocking(move || {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        let connection = Connection::open("op_bridge.db")?;
+                        init(ctx, connection).await
+                    })
+                })
+                .map(|result| result.map_err(Into::into).and_then(|result| result))
             })
             .launch()
             .await?;
