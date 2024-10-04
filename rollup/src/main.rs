@@ -59,7 +59,9 @@ impl<Node: FullNodeComponents> Rollup<Node> {
 
             if let Some(committed_chain) = notification.committed_chain() {
                 self.commit(&committed_chain).await?;
-                self.ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
+                self.ctx
+                    .events
+                    .send(ExExEvent::FinishedHeight(committed_chain.tip().num_hash()))?;
             }
         }
 

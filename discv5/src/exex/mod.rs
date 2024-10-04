@@ -61,7 +61,7 @@ impl<Node: FullNodeComponents> Future for ExEx<Node> {
                 if let Some(committed_chain) = notification.committed_chain() {
                     self.exex
                         .events
-                        .send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
+                        .send(ExExEvent::FinishedHeight(committed_chain.tip().num_hash()))?;
                 }
             }
         }

@@ -36,16 +36,15 @@ reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth" }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth" }
 reth-provider = { git = "https://github.com/paradigmxyz/reth" }
 reth-revm = { git = "https://github.com/paradigmxyz/reth" }
-reth-rpc-types = { git = "https://github.com/paradigmxyz/reth" }
 reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
 
-
-
 # alloy
+alloy-primitives = "0.8"
 alloy-sol-types = { version = "0.8", features = ["json"] }
-alloy-signer-local = "0.3"
-alloy-signer = "0.3"
+alloy-signer-local = "0.4"
+alloy-signer = "0.4"
 alloy-rlp = "0.3"
+alloy-rpc-types = "0.4"
 
 # async
 futures = "0.3"
@@ -63,3 +62,25 @@ eyre = "0.6"
 # testing
 reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth" }
 reth-testing-utils = { git = "https://github.com/paradigmxyz/reth" }
+
+[patch."https://github.com/paradigmxyz/reth"]
+reth = { path = "/Users/shekhirin/Projects/reth/bin/reth" }
+reth-chainspec = { path = "/Users/shekhirin/Projects/reth/crates/chainspec" }
+reth-discv5 = { path = "/Users/shekhirin/Projects/reth/crates/net/discv5" }
+reth-execution-errors = { path = "/Users/shekhirin/Projects/reth/crates/evm/execution-errors" }
+reth-execution-types = { path = "/Users/shekhirin/Projects/reth/crates/evm/execution-types" }
+reth-exex = { path = "/Users/shekhirin/Projects/reth/crates/exex/exex" }
+reth-eth-wire = { path = "/Users/shekhirin/Projects/reth/crates/net/eth-wire" }
+reth-evm = { path = "/Users/shekhirin/Projects/reth/crates/evm" }
+reth-network = { path = "/Users/shekhirin/Projects/reth/crates/net/network" }
+reth-network-api = { path = "/Users/shekhirin/Projects/reth/crates/net/network-api" }
+reth-network-peers = { path = "/Users/shekhirin/Projects/reth/crates/net/peers" }
+reth-node-api = { path = "/Users/shekhirin/Projects/reth/crates/node/api" }
+reth-node-ethereum = { path = "/Users/shekhirin/Projects/reth/crates/ethereum/node" }
+reth-primitives = { path = "/Users/shekhirin/Projects/reth/crates/primitives" }
+reth-provider = { path = "/Users/shekhirin/Projects/reth/crates/storage/provider" }
+reth-revm = { path = "/Users/shekhirin/Projects/reth/crates/revm" }
+reth-tracing = { path = "/Users/shekhirin/Projects/reth/crates/tracing" }
+
+reth-exex-test-utils = { path = "/Users/shekhirin/Projects/reth/crates/exex/test-utils" }
+reth-testing-utils = { path = "/Users/shekhirin/Projects/reth/testing/testing-utils" }

@@ -52,7 +52,9 @@ impl<Node: FullNodeComponents + Unpin> Future for InMemoryStateExEx<Node> {
             if let Some(committed_chain) = notification.committed_chain() {
                 // extend the state with the new chain
                 this.execution_outcome.extend(committed_chain.execution_outcome().clone());
-                this.ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
+                this.ctx
+                    .events
+                    .send(ExExEvent::FinishedHeight(committed_chain.tip().num_hash()))?;
             }
         }
 

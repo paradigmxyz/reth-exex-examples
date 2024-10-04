@@ -2,13 +2,14 @@ mod rpc;
 
 use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
 
+use alloy_primitives::BlockNumber;
 use clap::{Args, Parser};
 use eyre::OptionExt;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use jsonrpsee::tracing::instrument;
 use reth::{
-    args::utils::DefaultChainSpecParser,
-    primitives::{BlockId, BlockNumber, BlockNumberOrTag},
+    args::utils::EthereumChainSpecParser,
+    primitives::{BlockId, BlockNumberOrTag},
     providers::{BlockIdReader, BlockReader, HeaderProvider, StateProviderFactory},
 };
 use reth_evm::execute::BlockExecutorProvider;
@@ -107,7 +108,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         if let Some(committed_chain) = notification.committed_chain() {
             process_committed_chain(&committed_chain)?;
 
-            self.ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
+            self.ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().num_hash()))?;
         }
 
         Ok(())
@@ -233,7 +234,8 @@ async fn backfill_with_job<
 fn process_committed_chain(chain: &Chain) -> eyre::Result<()> {
     // Calculate the number of blocks and transactions in the committed chain
     let blocks = chain.blocks().len();
-    let transactions = chain.blocks().values().map(|block| block.body.len()).sum::<usize>();
+    let transactions =
+        chain.blocks().values().map(|block| block.body.transactions.len()).sum::<usize>();
 
     info!(first_block = %chain.execution_outcome().first_block, %blocks, %transactions, "Processed committed blocks");
     Ok(())
@@ -251,7 +253,7 @@ struct BackfillArgsExt {
 }
 
 fn main() -> eyre::Result<()> {
-    reth::cli::Cli::<DefaultChainSpecParser, BackfillArgsExt>::parse().run(
+    reth::cli::Cli::<EthereumChainSpecParser, BackfillArgsExt>::parse().run(
         |builder, args| async move {
             // Create a channel for backfill requests. Sender will go to the RPC server, receiver
             // will be used by the ExEx.

@@ -198,7 +198,7 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
 
             // Send a finished height event, signaling the node that we don't need any blocks below
             // this height anymore
-            ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
+            ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().num_hash()))?;
         }
     }
 
