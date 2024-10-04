@@ -2,14 +2,14 @@ use clap::Parser;
 
 use exex::ExEx;
 use network::{cli_ext::Discv5ArgsExt, DiscV5ExEx};
-use reth::args::utils::DefaultChainSpecParser;
+use reth::args::utils::EthereumChainSpecParser;
 use reth_node_ethereum::EthereumNode;
 
 mod exex;
 mod network;
 
 fn main() -> eyre::Result<()> {
-    reth::cli::Cli::<DefaultChainSpecParser, Discv5ArgsExt>::parse().run(
+    reth::cli::Cli::<EthereumChainSpecParser, Discv5ArgsExt>::parse().run(
         |builder, args| async move {
             let tcp_port = args.tcp_port;
             let udp_port = args.udp_port;
