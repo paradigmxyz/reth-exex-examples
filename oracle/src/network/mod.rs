@@ -62,7 +62,7 @@ impl Future for OracleNetwork {
                         "Established connection, will start gossiping"
                     );
                 }
-                None => return Poll::Ready(Ok(())),
+                None => return Poll::Pending,
             }
         }
     }

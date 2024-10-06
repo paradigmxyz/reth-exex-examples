@@ -4776,6 +4776,7 @@ dependencies = [
  "enr",
  "eyre",
  "futures",
+ "rand",
  "reth",
  "reth-discv5",
  "reth-eth-wire",
