@@ -81,7 +81,7 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
         loop {
             tokio::select! {
                 Some(notification) = self.ctx.notifications.next() => {
-                    self.handle_notification(notification).await?;
+                    self.handle_notification(notification?).await?;
                 }
                 Some(message) = self.backfill_rx.recv() => {
                     self.handle_backfill_message(message).await;

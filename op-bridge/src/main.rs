@@ -1,6 +1,6 @@
 use alloy_primitives::{address, Address};
 use alloy_sol_types::{sol, SolEventInterface};
-use futures::{Future, FutureExt, StreamExt};
+use futures::{Future, FutureExt, TryStreamExt};
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
@@ -103,7 +103,7 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
     connection: Connection,
 ) -> eyre::Result<()> {
     // Process all new chain state notifications
-    while let Some(notification) = ctx.notifications.next().await {
+    while let Some(notification) = ctx.notifications.try_next().await? {
         // Revert all deposits and withdrawals
         if let Some(reverted_chain) = notification.reverted_chain() {
             let events = decode_chain_into_events(&reverted_chain);

@@ -1,6 +1,6 @@
 #![warn(unused_crate_dependencies)]
 
-use futures_util::StreamExt;
+use futures_util::{FutureExt, StreamExt, TryStreamExt};
 use reth_execution_types::ExecutionOutcome;
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
@@ -33,7 +33,7 @@ impl<Node: FullNodeComponents + Unpin> Future for InMemoryStateExEx<Node> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
 
-        while let Some(notification) = ready!(this.ctx.notifications.poll_next_unpin(cx)) {
+        while let Some(notification) = ready!(this.ctx.notifications.try_next().poll_unpin(cx))? {
             match &notification {
                 ExExNotification::ChainCommitted { new } => {
                     info!(committed_chain = ?new.range(), "Received commit");
