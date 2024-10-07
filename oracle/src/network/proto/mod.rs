@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 
-use alloy_rlp::{Decodable, Encodable};
+use alloy_primitives::Address;
+use alloy_rlp::{Buf, BufMut, BytesMut, Decodable, Encodable};
 use connection::{OracleCommand, OracleConnHandler};
 use data::SignedTicker;
 use reth_eth_wire::{protocol::Protocol, Capability};
 use reth_network::{protocol::ProtocolHandler, Direction};
 use reth_network_api::PeerId;
-use reth_primitives::{Address, Buf, BufMut, BytesMut};
 use std::net::SocketAddr;
 use tokio::sync::mpsc;
 
@@ -188,12 +188,12 @@ pub(crate) enum ProtocolEvent {
 mod tests {
     use super::*;
     use crate::offchain_data::binance::ticker::Ticker;
+    use alloy_primitives::B256;
     use alloy_signer::SignerSync;
     use alloy_signer_local::PrivateKeySigner;
     use mpsc::{UnboundedReceiver, UnboundedSender};
     use reth::providers::test_utils::MockEthProvider;
     use reth_network::test_utils::Testnet;
-    use reth_primitives::B256;
     use tokio::sync::oneshot;
 
     #[tokio::test(flavor = "multi_thread")]

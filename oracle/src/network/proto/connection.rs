@@ -1,15 +1,15 @@
 use super::{
     data::SignedTicker, OracleProtoMessage, OracleProtoMessageKind, ProtocolEvent, ProtocolState,
 };
-use alloy_rlp::Encodable;
+use alloy_primitives::{Address, B256};
+use alloy_rlp::{BytesMut, Encodable};
 use futures::{Stream, StreamExt};
 use reth_eth_wire::{
     capability::SharedCapabilities, multiplex::ProtocolConnection, protocol::Protocol,
 };
 use reth_network::protocol::{ConnectionHandler, OnNotSupported};
 use reth_network_api::Direction;
-use reth_primitives::{Address, BytesMut, B256};
-use reth_rpc_types::PeerId;
+use reth_network_peers::PeerId;
 use std::{
     collections::HashMap,
     pin::Pin,

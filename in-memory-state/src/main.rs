@@ -99,7 +99,7 @@ mod tests {
         let block_number_1 = block_1.number;
         let execution_outcome1 = ExecutionOutcome::new(
             BundleState::default(),
-            vec![random_receipt(&mut rng, &block_1.body[0], None)].into(),
+            vec![random_receipt(&mut rng, &block_1.body.transactions[0], None)].into(),
             block_1.number,
             vec![],
         );
@@ -123,7 +123,7 @@ mod tests {
                 .ok_or(eyre::eyre!("failed to recover senders"))?;
         let execution_outcome2 = ExecutionOutcome::new(
             BundleState::default(),
-            vec![random_receipt(&mut rng, &block_2.body[0], None)].into(),
+            vec![random_receipt(&mut rng, &block_2.body.transactions[0], None)].into(),
             block_2.number,
             vec![],
         );
