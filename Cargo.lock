@@ -4640,6 +4640,7 @@ dependencies = [
 name = "op-bridge"
 version = "0.0.0"
 dependencies = [
+ "alloy-consensus 0.4.2",
  "alloy-primitives",
  "alloy-sol-types",
  "eyre",

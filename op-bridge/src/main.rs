@@ -272,13 +272,14 @@ fn main() -> eyre::Result<()> {
 mod tests {
     use std::pin::pin;
 
+    use alloy_consensus::TxLegacy;
+    use alloy_primitives::{Address, TxKind, U256};
     use alloy_sol_types::SolEvent;
     use reth::revm::db::BundleState;
     use reth_execution_types::{Chain, ExecutionOutcome};
     use reth_exex_test_utils::{test_exex_context, PollOnce};
     use reth_primitives::{
-        Address, Block, Header, Log, Receipt, Transaction, TransactionSigned, TxKind, TxLegacy,
-        TxType, U256,
+        Block, BlockBody, Header, Log, Receipt, Transaction, TransactionSigned, TxType,
     };
     use reth_testing_utils::generators::sign_tx_with_random_key_pair;
     use rusqlite::Connection;
@@ -346,8 +347,7 @@ mod tests {
         // Construct a block
         let block = Block {
             header: Header::default(),
-            body: vec![deposit_tx, withdrawal_tx],
-            ..Default::default()
+            body: BlockBody { transactions: vec![deposit_tx, withdrawal_tx], ..Default::default() },
         }
         .seal_slow()
         .seal_with_senders()
@@ -360,7 +360,7 @@ mod tests {
                 BundleState::default(),
                 vec![deposit_tx_receipt, withdrawal_tx_receipt].into(),
                 block.number,
-                vec![block.requests.clone().unwrap_or_default()],
+                vec![block.body.requests.clone().unwrap_or_default()],
             ),
             None,
         );
@@ -388,7 +388,7 @@ mod tests {
                 from_address.to_string(),
                 to_address.to_string(),
                 deposit_event.amount.to_string(),
-                block.body[0].hash().to_string()
+                block.body.transactions[0].hash().to_string()
             )
         );
 
@@ -408,7 +408,7 @@ mod tests {
                 from_address.to_string(),
                 to_address.to_string(),
                 withdrawal_event.amount.to_string(),
-                block.body[1].hash().to_string()
+                block.body.transactions[1].hash().to_string()
             )
         );
 

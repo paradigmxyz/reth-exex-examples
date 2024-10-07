@@ -26,8 +26,12 @@ rusqlite = { version = "0.31.0", features = ["bundled"] }
 tokio.workspace = true
 
 [dev-dependencies]
+# reth
 reth-exex-test-utils.workspace = true
 reth-testing-utils.workspace = true
+
+# alloy
+alloy-consensus.workspace = true
 
 tokio.workspace = true
 rand = "0.8"

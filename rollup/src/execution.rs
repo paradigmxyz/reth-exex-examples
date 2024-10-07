@@ -48,13 +48,10 @@ pub async fn execute_block<Pool: TransactionPool>(
     let (executed_txs, receipts, results) = execute_transactions(&mut evm, &header, transactions)?;
 
     // Construct block and recover senders
-    let block = Block {
-        header,
-        body: BlockBody { transactions: executed_txs, ..Default::default() },
-        ..Default::default()
-    }
-    .with_recovered_senders()
-    .ok_or_eyre("failed to recover senders")?;
+    let block =
+        Block { header, body: BlockBody { transactions: executed_txs, ..Default::default() } }
+            .with_recovered_senders()
+            .ok_or_eyre("failed to recover senders")?;
 
     let bundle = evm.db_mut().take_bundle();
 
