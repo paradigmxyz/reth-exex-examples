@@ -7,18 +7,23 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-reth.workspace = true
+# reth
 reth-exex.workspace = true
 reth-node-api.workspace = true
 reth-node-ethereum.workspace = true
 reth-tracing.workspace = true
+reth.workspace = true
+
+# alloy
+alloy-consensus.workspace = true
+alloy-eips.workspace = true
+alloy-primitives.workspace = true
 
 eyre.workspace = true
-
-tonic = "0.12"
 prost = "0.13"
-tokio.workspace = true
 tokio-stream = "0.1"
+tokio.workspace = true
+tonic = "0.12"
 
 [build-dependencies]
 tonic-build = "0.12"
