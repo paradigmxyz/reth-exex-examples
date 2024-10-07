@@ -36,6 +36,7 @@ reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth" }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth" }
 reth-provider = { git = "https://github.com/paradigmxyz/reth" }
 reth-revm = { git = "https://github.com/paradigmxyz/reth" }
+reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth" }
 reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
 
 # alloy

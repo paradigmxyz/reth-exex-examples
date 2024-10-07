@@ -20,7 +20,7 @@ reth-tracing.workspace = true
 reth.workspace = true
 
 # alloy
-alloy-consensus.workspace = true
+alloy-consensus = { workspace = true, features = ["k256"] }
 alloy-eips.workspace = true
 alloy-genesis = "0.4"
 alloy-primitives.workspace = true
@@ -41,4 +41,4 @@ serde_json = "1"
 [dev-dependencies]
 reth-testing-utils.workspace = true
 secp256k1 = "0.29"
-
+reth-transaction-pool = { workspace = true, features = ["test-utils"] }

@@ -1,6 +1,6 @@
 use crate::{db::Database, Zenith, CHAIN_ID, CHAIN_SPEC};
 use alloy_consensus::{Blob, SidecarCoder, SimpleCoder};
-use alloy_eips::eip4844::kzg_to_versioned_hash;
+use alloy_eips::{eip2718::Decodable2718, eip4844::kzg_to_versioned_hash};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_rlp::Decodable as _;
 use eyre::OptionExt;
@@ -174,14 +174,15 @@ async fn decode_transactions<Pool: TransactionPool>(
     }
 
     // Decode block data, filter only transactions with the correct chain ID and recover senders
-    let transactions = Vec::<TransactionSigned>::decode(&mut raw_transactions.as_ref())?
-        .into_iter()
-        .filter(|tx| tx.chain_id() == Some(CHAIN_ID))
-        .map(|tx| {
+    let raw_transactions: Vec<Vec<u8>> = alloy_rlp::decode_exact(raw_transactions.as_ref())?;
+    let mut transactions = Vec::with_capacity(raw_transactions.len());
+    for raw_transaction in raw_transactions {
+        let tx = TransactionSigned::decode_2718(&mut &raw_transaction[..])?;
+        if tx.chain_id() == Some(CHAIN_ID) {
             let sender = tx.recover_signer().ok_or(eyre::eyre!("failed to recover signer"))?;
-            Ok((tx, sender))
-        })
-        .collect::<eyre::Result<_>>()?;
+            transactions.push((tx, sender));
+        }
+    }
 
     Ok(transactions)
 }
@@ -266,10 +267,6 @@ mod tests {
     use alloy_eips::eip2718::Encodable2718;
     use alloy_primitives::{bytes, keccak256, BlockNumber, TxKind, U256};
     use alloy_sol_types::{sol, SolCall};
-    use reth::transaction_pool::{
-        test_utils::{testing_pool, MockTransaction},
-        TransactionOrigin, TransactionPool,
-    };
     use reth_primitives::{
         constants::ETH_TO_WEI,
         public_key_to_address,
@@ -278,6 +275,10 @@ mod tests {
     };
     use reth_revm::Evm;
     use reth_testing_utils::generators::{self, sign_tx_with_key_pair};
+    use reth_transaction_pool::{
+        test_utils::{testing_pool, MockTransaction},
+        TransactionOrigin, TransactionPool,
+    };
     use rusqlite::Connection;
     use secp256k1::{Keypair, Secp256k1};
 

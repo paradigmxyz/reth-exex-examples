@@ -8147,6 +8147,7 @@ dependencies = [
  "reth-revm",
  "reth-testing-utils",
  "reth-tracing",
+ "reth-transaction-pool",
  "rusqlite",
  "secp256k1",
  "serde_json",
