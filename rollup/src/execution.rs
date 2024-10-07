@@ -1,5 +1,7 @@
 use crate::{db::Database, Zenith, CHAIN_ID, CHAIN_SPEC};
 use alloy_consensus::{Blob, SidecarCoder, SimpleCoder};
+use alloy_eips::eip4844::kzg_to_versioned_hash;
+use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_rlp::Decodable as _;
 use eyre::OptionExt;
 use reth::transaction_pool::TransactionPool;
@@ -8,11 +10,9 @@ use reth_node_api::{ConfigureEvm, ConfigureEvmEnv};
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{
     constants,
-    eip4844::kzg_to_versioned_hash,
-    keccak256,
     revm_primitives::{CfgEnvWithHandlerCfg, EVMError, ExecutionResult, ResultAndState},
-    Address, Block, BlockWithSenders, Bytes, EthereumHardfork, Header, Receipt, TransactionSigned,
-    TxType, B256, U256,
+    Block, BlockBody, BlockWithSenders, EthereumHardfork, Header, Receipt, TransactionSigned,
+    TxType,
 };
 use reth_revm::{
     db::{states::bundle_state::BundleRetention, BundleState},
@@ -41,16 +41,20 @@ pub async fn execute_block<Pool: TransactionPool>(
     let transactions = decode_transactions(pool, tx, block_data, block_data_hash).await?;
 
     // Configure EVM
-    let evm_config = EthEvmConfig::default();
+    let evm_config = EthEvmConfig::new(CHAIN_SPEC.clone());
     let mut evm = configure_evm(&evm_config, db, &header);
 
     // Execute transactions
     let (executed_txs, receipts, results) = execute_transactions(&mut evm, &header, transactions)?;
 
     // Construct block and recover senders
-    let block = Block { header, body: executed_txs, ..Default::default() }
-        .with_recovered_senders()
-        .ok_or_eyre("failed to recover senders")?;
+    let block = Block {
+        header,
+        body: BlockBody { transactions: executed_txs, ..Default::default() },
+        ..Default::default()
+    }
+    .with_recovered_senders()
+    .ok_or_eyre("failed to recover senders")?;
 
     let bundle = evm.db_mut().take_bundle();
 
@@ -107,7 +111,7 @@ fn configure_evm<'a>(
     );
 
     let mut cfg = CfgEnvWithHandlerCfg::new_with_spec_id(evm.cfg().clone(), evm.spec_id());
-    config.fill_cfg_and_block_env(&mut cfg, evm.block_mut(), &CHAIN_SPEC, header, U256::ZERO);
+    config.fill_cfg_and_block_env(&mut cfg, evm.block_mut(), header, U256::ZERO);
     *evm.cfg_mut() = cfg.cfg_env;
 
     evm
@@ -210,7 +214,7 @@ fn execute_transactions(
             }
             // Execute transaction.
             // Fill revm structure.
-            EthEvmConfig::default().fill_tx_env(evm.tx_mut(), &transaction, sender);
+            EthEvmConfig::new(CHAIN_SPEC.clone()).fill_tx_env(evm.tx_mut(), &transaction, sender);
 
             let ResultAndState { result, state } = match evm.transact() {
                 Ok(result) => result,
@@ -261,18 +265,19 @@ fn execute_transactions(
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use alloy_consensus::{SidecarBuilder, SimpleCoder};
+    use alloy_consensus::{SidecarBuilder, SimpleCoder, TxEip2930};
+    use alloy_eips::eip2718::Encodable2718;
+    use alloy_primitives::{bytes, keccak256, BlockNumber, TxKind, U256};
     use alloy_sol_types::{sol, SolCall};
     use reth::transaction_pool::{
         test_utils::{testing_pool, MockTransaction},
         TransactionOrigin, TransactionPool,
     };
     use reth_primitives::{
-        bytes,
         constants::ETH_TO_WEI,
-        keccak256, public_key_to_address,
+        public_key_to_address,
         revm_primitives::{AccountInfo, ExecutionResult, Output, TxEnv},
-        BlockNumber, Receipt, SealedBlockWithSenders, Transaction, TxEip2930, TxKind, U256,
+        Receipt, SealedBlockWithSenders, Transaction,
     };
     use reth_revm::Evm;
     use reth_testing_utils::generators::{self, sign_tx_with_key_pair};
@@ -438,7 +443,7 @@ mod tests {
             rewardAddress: ROLLUP_SUBMITTER_ADDRESS,
         };
         let encoded_transactions =
-            alloy_rlp::encode(vec![sign_tx_with_key_pair(key_pair, tx).envelope_encoded()]);
+            alloy_rlp::encode(vec![sign_tx_with_key_pair(key_pair, tx).encoded_2718()]);
         let block_data_hash = keccak256(&encoded_transactions);
 
         let pool = testing_pool();

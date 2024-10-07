@@ -20,8 +20,11 @@ reth-tracing.workspace = true
 reth.workspace = true
 
 # alloy
-alloy-consensus = { version = "0.3", features = ["kzg"] }
-alloy-rlp = "0.3"
+alloy-consensus.workspace = true
+alloy-eips.workspace = true
+alloy-genesis = "0.4"
+alloy-primitives.workspace = true
+alloy-rlp.workspace = true
 alloy-sol-types.workspace = true
 
 # async

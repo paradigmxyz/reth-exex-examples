@@ -8123,7 +8123,10 @@ dependencies = [
 name = "rollup"
 version = "0.0.0"
 dependencies = [
- "alloy-consensus 0.3.6",
+ "alloy-consensus 0.4.2",
+ "alloy-eips 0.4.2",
+ "alloy-genesis",
+ "alloy-primitives",
  "alloy-rlp",
  "alloy-sol-types",
  "eyre",
