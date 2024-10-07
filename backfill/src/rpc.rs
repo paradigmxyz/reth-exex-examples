@@ -1,10 +1,10 @@
+use alloy_primitives::BlockNumber;
 use async_trait::async_trait;
 use jsonrpsee::{
     core::RpcResult,
     proc_macros::rpc,
     types::{error::INTERNAL_ERROR_CODE, ErrorObject},
 };
-use reth::primitives::BlockNumber;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::BackfillMessage;

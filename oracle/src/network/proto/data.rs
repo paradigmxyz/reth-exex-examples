@@ -1,7 +1,7 @@
 use crate::offchain_data::binance::ticker::Ticker;
+use alloy_primitives::{keccak256, Address, B256};
 use alloy_rlp::{BytesMut, Encodable, RlpDecodable, RlpEncodable};
 use alloy_signer::Signature;
-use reth_primitives::{keccak256, Address, B256};
 
 #[derive(Clone, Debug, RlpEncodable, RlpDecodable, PartialEq)]
 pub struct SignedTicker {

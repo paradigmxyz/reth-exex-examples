@@ -36,16 +36,18 @@ reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth" }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth" }
 reth-provider = { git = "https://github.com/paradigmxyz/reth" }
 reth-revm = { git = "https://github.com/paradigmxyz/reth" }
-reth-rpc-types = { git = "https://github.com/paradigmxyz/reth" }
+reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth" }
 reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
 
-
-
 # alloy
-alloy-sol-types = { version = "0.8", features = ["json"] }
-alloy-signer-local = "0.3"
-alloy-signer = "0.3"
+alloy-eips = "0.4"
+alloy-consensus = "0.4"
+alloy-primitives = "0.8"
 alloy-rlp = "0.3"
+alloy-rpc-types = "0.4"
+alloy-signer = "0.4"
+alloy-signer-local = "0.4"
+alloy-sol-types = { version = "0.8", features = ["json"] }
 
 # async
 futures = "0.3"

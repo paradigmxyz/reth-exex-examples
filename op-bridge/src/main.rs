@@ -1,10 +1,11 @@
+use alloy_primitives::{address, Address};
 use alloy_sol_types::{sol, SolEventInterface};
-use futures::{Future, StreamExt};
+use futures::{Future, FutureExt, StreamExt};
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
-use reth_primitives::{address, Address, Log, SealedBlockWithSenders, TransactionSigned};
+use reth_primitives::{Log, SealedBlockWithSenders, TransactionSigned};
 use reth_tracing::tracing::info;
 use rusqlite::Connection;
 
@@ -198,7 +199,7 @@ async fn op_bridge_exex<Node: FullNodeComponents>(
 
             // Send a finished height event, signaling the node that we don't need any blocks below
             // this height anymore
-            ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
+            ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().num_hash()))?;
         }
     }
 
@@ -218,7 +219,7 @@ fn decode_chain_into_events(
         .flat_map(|(block, receipts)| {
             block
                 .body
-                .iter()
+                .transactions()
                 .zip(receipts.iter().flatten())
                 .map(move |(tx, receipt)| (block, tx, receipt))
         })
@@ -242,9 +243,23 @@ fn main() -> eyre::Result<()> {
     reth::cli::Cli::parse_args().run(|builder, _| async move {
         let handle = builder
             .node(EthereumNode::default())
-            .install_exex("OPBridge", |ctx| async move {
-                let connection = Connection::open("op_bridge.db")?;
-                init(ctx, connection).await
+            .install_exex("OPBridge", move |ctx| {
+                // Rust seems to trigger a bogus higher-ranked lifetime error when using
+                // just an async closure here -- using `spawn_blocking` avoids this
+                // particular issue.
+                //
+                // To avoid the higher ranked lifetime error we use `spawn_blocking`
+                // which will move the closure to another blocking-allowed thread,
+                // then execute.
+                //
+                // Source: https://github.com/vados-cosmonic/wasmCloud/commit/440e8c377f6b02f45eacb02692e4d2fabd53a0ec
+                tokio::task::spawn_blocking(move || {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        let connection = Connection::open("op_bridge.db")?;
+                        init(ctx, connection).await
+                    })
+                })
+                .map(|result| result.map_err(Into::into).and_then(|result| result))
             })
             .launch()
             .await?;
@@ -257,13 +272,14 @@ fn main() -> eyre::Result<()> {
 mod tests {
     use std::pin::pin;
 
+    use alloy_consensus::TxLegacy;
+    use alloy_primitives::{Address, TxKind, U256};
     use alloy_sol_types::SolEvent;
     use reth::revm::db::BundleState;
     use reth_execution_types::{Chain, ExecutionOutcome};
     use reth_exex_test_utils::{test_exex_context, PollOnce};
     use reth_primitives::{
-        Address, Block, Header, Log, Receipt, Transaction, TransactionSigned, TxKind, TxLegacy,
-        TxType, U256,
+        Block, BlockBody, Header, Log, Receipt, Transaction, TransactionSigned, TxType,
     };
     use reth_testing_utils::generators::sign_tx_with_random_key_pair;
     use rusqlite::Connection;
@@ -331,8 +347,7 @@ mod tests {
         // Construct a block
         let block = Block {
             header: Header::default(),
-            body: vec![deposit_tx, withdrawal_tx],
-            ..Default::default()
+            body: BlockBody { transactions: vec![deposit_tx, withdrawal_tx], ..Default::default() },
         }
         .seal_slow()
         .seal_with_senders()
@@ -345,7 +360,7 @@ mod tests {
                 BundleState::default(),
                 vec![deposit_tx_receipt, withdrawal_tx_receipt].into(),
                 block.number,
-                vec![block.requests.clone().unwrap_or_default()],
+                vec![block.body.requests.clone().unwrap_or_default()],
             ),
             None,
         );
@@ -373,7 +388,7 @@ mod tests {
                 from_address.to_string(),
                 to_address.to_string(),
                 deposit_event.amount.to_string(),
-                block.body[0].hash().to_string()
+                block.body.transactions[0].hash().to_string()
             )
         );
 
@@ -393,7 +408,7 @@ mod tests {
                 from_address.to_string(),
                 to_address.to_string(),
                 withdrawal_event.amount.to_string(),
-                block.body[1].hash().to_string()
+                block.body.transactions[1].hash().to_string()
             )
         );
 

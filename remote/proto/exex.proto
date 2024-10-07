@@ -64,7 +64,7 @@ message Header {
   uint64 gas_used = 12;
   uint64 timestamp = 13;
   bytes mix_hash = 14;
-  uint64 nonce = 15;
+  bytes nonce = 15;
   optional uint64 base_fee_per_gas = 16;
   optional uint64 blob_gas_used = 17;
   optional uint64 excess_blob_gas = 18;
@@ -88,7 +88,7 @@ message Transaction {
 message Signature {
   bytes r = 1;
   bytes s = 2;
-  bool odd_y_parity = 3;
+  bool y_parity = 3;
 }
 
 message TransactionLegacy {
@@ -144,7 +144,7 @@ message TransactionEip7702 {
   bytes gas_limit = 3;
   bytes max_fee_per_gas = 4;
   bytes max_priority_fee_per_gas = 5;
-  TxKind to = 6;
+  bytes to = 6;
   bytes value = 7;
   repeated AccessListItem access_list = 8;
   repeated AuthorizationListItem authorization_list = 9;

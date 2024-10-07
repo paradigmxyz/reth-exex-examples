@@ -43,7 +43,7 @@ async fn exex<Node: FullNodeComponents>(
 ) -> eyre::Result<()> {
     while let Some(notification) = ctx.notifications.next().await {
         if let Some(committed_chain) = notification.committed_chain() {
-            ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
+            ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().num_hash()))?;
         }
 
         let _ = notifications.send(notification);

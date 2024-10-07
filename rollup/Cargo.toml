@@ -20,8 +20,11 @@ reth-tracing.workspace = true
 reth.workspace = true
 
 # alloy
-alloy-consensus = { version = "0.3", features = ["kzg"] }
-alloy-rlp = "0.3"
+alloy-consensus = { workspace = true, features = ["k256"] }
+alloy-eips.workspace = true
+alloy-genesis = "0.4"
+alloy-primitives.workspace = true
+alloy-rlp.workspace = true
 alloy-sol-types.workspace = true
 
 # async
@@ -38,4 +41,4 @@ serde_json = "1"
 [dev-dependencies]
 reth-testing-utils.workspace = true
 secp256k1 = "0.29"
-
+reth-transaction-pool = { workspace = true, features = ["test-utils"] }

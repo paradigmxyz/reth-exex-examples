@@ -4,6 +4,8 @@
 //! The rollup contract accepts blocks of transactions and deposits of ETH and is deployed on
 //! Holesky at [ROLLUP_CONTRACT_ADDRESS], see <https://github.com/init4tech/zenith/blob/e0481e930947513166881a83e276b316c2f38502/src/Zenith.sol>.
 
+use alloy_genesis::Genesis;
+use alloy_primitives::{address, Address, U256};
 use alloy_sol_types::{sol, SolEventInterface, SolInterface};
 use db::Database;
 use execution::execute_block;
@@ -14,7 +16,7 @@ use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
-use reth_primitives::{address, Address, Genesis, SealedBlockWithSenders, TransactionSigned, U256};
+use reth_primitives::{SealedBlockWithSenders, TransactionSigned};
 use reth_tracing::tracing::{error, info};
 use rusqlite::Connection;
 use std::sync::Arc;
@@ -59,7 +61,9 @@ impl<Node: FullNodeComponents> Rollup<Node> {
 
             if let Some(committed_chain) = notification.committed_chain() {
                 self.commit(&committed_chain).await?;
-                self.ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().number))?;
+                self.ctx
+                    .events
+                    .send(ExExEvent::FinishedHeight(committed_chain.tip().num_hash()))?;
             }
         }
 
@@ -107,7 +111,7 @@ impl<Node: FullNodeComponents> Rollup<Node> {
                                     tx_hash = %tx.recalculate_hash(),
                                     chain_id = %header.rollupChainId,
                                     sequence = %header.sequence,
-                                    transactions = block.body.len(),
+                                    transactions = block.body.transactions.len(),
                                     "Block submitted, executed and inserted into database"
                                 );
                             }
@@ -238,7 +242,7 @@ fn decode_chain_into_rollup_events(
         .flat_map(|(block, receipts)| {
             block
                 .body
-                .iter()
+                .transactions()
                 .zip(receipts.iter().flatten())
                 .map(move |(tx, receipt)| (block, tx, receipt))
         })

@@ -4,9 +4,10 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
+use alloy_primitives::{Address, Bytes, B256, U256};
 use reth_primitives::{
     revm_primitives::{AccountInfo, Bytecode},
-    Address, Bytes, SealedBlockWithSenders, StorageEntry, B256, U256,
+    SealedBlockWithSenders, StorageEntry,
 };
 use reth_provider::{bundle_state::StorageRevertsIter, OriginalValuesKnown};
 use reth_revm::db::{
