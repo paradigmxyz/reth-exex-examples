@@ -4,7 +4,7 @@ use exex::ExEx;
 use network::{proto::OracleProtoHandler, OracleNetwork};
 use offchain_data::DataFeederStream;
 use oracle::Oracle;
-use reth::args::utils::DefaultChainSpecParser;
+use reth::chainspec::EthereumChainSpecParser;
 use reth_network::{protocol::IntoRlpxSubProtocol, NetworkProtocols};
 use reth_node_ethereum::EthereumNode;
 
@@ -17,7 +17,7 @@ mod oracle;
 const ORACLE_EXEX_ID: &str = "exex-oracle";
 
 fn main() -> eyre::Result<()> {
-    reth::cli::Cli::<DefaultChainSpecParser, OracleExt>::parse().run(|builder, args| async move {
+    reth::cli::Cli::<EthereumChainSpecParser, OracleExt>::parse().run(|builder, args| async move {
         let tcp_port = args.tcp_port;
         let udp_port = args.udp_port;
 

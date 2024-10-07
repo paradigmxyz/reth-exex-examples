@@ -2,7 +2,7 @@ use clap::Parser;
 
 use exex::ExEx;
 use network::{cli_ext::Discv5ArgsExt, DiscV5ExEx};
-use reth::args::utils::EthereumChainSpecParser;
+use reth::chainspec::EthereumChainSpecParser;
 use reth_node_ethereum::EthereumNode;
 
 mod exex;

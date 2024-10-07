@@ -8,7 +8,7 @@ use eyre::OptionExt;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use jsonrpsee::tracing::instrument;
 use reth::{
-    args::utils::EthereumChainSpecParser,
+    chainspec::EthereumChainSpecParser,
     primitives::{BlockId, BlockNumberOrTag},
     providers::{BlockIdReader, BlockReader, HeaderProvider, StateProviderFactory},
 };
