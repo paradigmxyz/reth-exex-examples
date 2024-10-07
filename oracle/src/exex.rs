@@ -1,5 +1,5 @@
 use eyre::Result;
-use futures::{Future, StreamExt};
+use futures::{Future, FutureExt, TryStreamExt};
 use reth::providers::ExecutionOutcome;
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
@@ -28,7 +28,7 @@ impl<Node: FullNodeComponents> Future for ExEx<Node> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // Continuously poll the ExExContext notifications
         let this = self.get_mut();
-        while let Some(notification) = ready!(this.ctx.notifications.poll_next_unpin(cx)) {
+        while let Some(notification) = ready!(this.ctx.notifications.try_next().poll_unpin(cx))? {
             match &notification {
                 ExExNotification::ChainCommitted { new } => {
                     info!(committed_chain = ?new.range(), "Received commit");

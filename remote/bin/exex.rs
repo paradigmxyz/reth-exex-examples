@@ -41,7 +41,7 @@ async fn exex<Node: FullNodeComponents>(
     mut ctx: ExExContext<Node>,
     notifications: broadcast::Sender<ExExNotification>,
 ) -> eyre::Result<()> {
-    while let Some(notification) = ctx.notifications.next().await {
+    while let Some(notification) = ctx.notifications.try_next().await? {
         if let Some(committed_chain) = notification.committed_chain() {
             ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().num_hash()))?;
         }

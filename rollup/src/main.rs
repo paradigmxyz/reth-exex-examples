@@ -9,7 +9,7 @@ use alloy_primitives::{address, Address, U256};
 use alloy_sol_types::{sol, SolEventInterface, SolInterface};
 use db::Database;
 use execution::execute_block;
-use futures_util::StreamExt;
+use futures_util::TryStreamExt;
 use once_cell::sync::Lazy;
 use reth_chainspec::{ChainSpec, ChainSpecBuilder};
 use reth_execution_types::Chain;
@@ -54,7 +54,7 @@ impl<Node: FullNodeComponents> Rollup<Node> {
 
     async fn start(mut self) -> eyre::Result<()> {
         // Process all new chain state notifications
-        while let Some(notification) = self.ctx.notifications.next().await {
+        while let Some(notification) = self.ctx.notifications.try_next().await? {
             if let Some(reverted_chain) = notification.reverted_chain() {
                 self.revert(&reverted_chain)?;
             }
