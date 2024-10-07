@@ -1,6 +1,6 @@
 #![warn(unused_crate_dependencies)]
 
-use futures_util::{FutureExt, StreamExt, TryStreamExt};
+use futures_util::{FutureExt, TryStreamExt};
 use reth_execution_types::ExecutionOutcome;
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
