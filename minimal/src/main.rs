@@ -1,6 +1,5 @@
-use futures::{Future, StreamExt};
-use reth::primitives::BlockNumHash;
-use reth_exex::{ExExContext, ExExEvent, ExExHead, ExExNotification};
+use futures::{Future, TryStreamExt};
+use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
 use reth_tracing::tracing::info;
@@ -19,31 +18,19 @@ async fn exex_init<Node: FullNodeComponents>(
 ///
 /// This ExEx just prints out whenever either a new chain of blocks being added, or a chain of
 /// blocks being re-orged. After processing the chain, emits an [ExExEvent::FinishedHeight] event.
-async fn exex<Node: FullNodeComponents>(ctx: ExExContext<Node>) -> eyre::Result<()> {
-    let head: BlockNumHash = if std::fs::exists("exex_head.json")? {
-        serde_json::from_str(&std::fs::read_to_string("exex_head.json")?)?
-    } else {
-        (ctx.head.number, ctx.head.hash).into()
-    };
-
-    let mut notifications = ctx.notifications.with_head(ExExHead { block: head });
-    while let Some(notification) = notifications.next().await.transpose()? {
-        let exex_head: BlockNumHash = match &notification {
+async fn exex<Node: FullNodeComponents>(mut ctx: ExExContext<Node>) -> eyre::Result<()> {
+    while let Some(notification) = ctx.notifications.try_next().await? {
+        match &notification {
             ExExNotification::ChainCommitted { new } => {
                 info!(committed_chain = ?new.range(), "Received commit");
-                new.tip().num_hash()
             }
             ExExNotification::ChainReorged { old, new } => {
                 info!(from_chain = ?old.range(), to_chain = ?new.range(), "Received reorg");
-                new.tip().num_hash()
             }
             ExExNotification::ChainReverted { old } => {
                 info!(reverted_chain = ?old.range(), "Received revert");
-                (old.first().number - 1, old.first().parent_hash).into()
             }
         };
-
-        std::fs::write("exex_head.json", serde_json::to_string(&exex_head)?)?;
 
         if let Some(committed_chain) = notification.committed_chain() {
             ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().num_hash()))?;
