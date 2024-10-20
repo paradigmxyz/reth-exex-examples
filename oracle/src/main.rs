@@ -19,6 +19,7 @@ mod oracle;
 
 const ORACLE_EXEX_ID: &str = "exex-oracle";
 
+/// Helper function to start the oracle stack.
 async fn start<Node: FullNodeComponents>(
     ctx: ExExContext<Node>,
     tcp_port: u16,
@@ -67,26 +68,8 @@ fn main() -> eyre::Result<()> {
                 // Source: https://github.com/vados-cosmonic/wasmCloud/commit/440e8c377f6b02f45eacb02692e4d2fabd53a0ec
                 tokio::task::spawn_blocking(move || {
                     tokio::runtime::Handle::current().block_on(async move {
-                        // define the oracle subprotocol
-                        let (subproto, proto_events, to_peers) = OracleProtoHandler::new();
-                        // add it to the network as a subprotocol
-                        ctx.network().add_rlpx_sub_protocol(subproto.into_rlpx_sub_protocol());
-
-                        // the instance of the execution extension that will handle chain events
-                        let exex = ExEx::new(ctx);
-
-                        // the instance of the oracle network that will handle discovery and
-                        // gossiping of data
-                        let network = OracleNetwork::new(proto_events, tcp_port, udp_port).await?;
-                        // the off-chain data feed stream
-                        let data_feed = DataFeederStream::new(args.binance_symbols).await?;
-
-                        // the oracle instance that will orchestrate the network, the execution
-                        // extensions, the offchain data stream and the
-                        // gossiping the oracle will always sign and
-                        // broadcast data via the channel until a peer is
-                        // subcribed to it
-                        let oracle = Oracle::new(exex, network, data_feed, to_peers);
+                        let (oracle, _net) =
+                            start(ctx, tcp_port, udp_port, args.binance_symbols).await?;
                         Ok(oracle)
                     })
                 })
@@ -102,47 +85,60 @@ fn main() -> eyre::Result<()> {
 #[cfg(test)]
 mod tests {
     use crate::start;
+    use futures::StreamExt;
     use reth_exex_test_utils::test_exex_context;
+    use reth_network::{
+        NetworkEvent, NetworkEventListenerProvider, NetworkHandle, NetworkInfo, Peers,
+    };
+    use reth_network_api::PeerId;
+    use reth_tracing::tracing::info;
 
-    #[tokio::test]
-    async fn test_oracle() {
+    async fn wait_for_session(network: &NetworkHandle) -> PeerId {
+        let mut events = network.event_listener();
+
+        while let Some(event) = events.next().await {
+            if let NetworkEvent::SessionEstablished { peer_id, .. } = event {
+                info!("Session established with {}", peer_id);
+                return peer_id;
+            }
+            //info!("Unexpected event: {:?}", event);
+        }
+
+        unreachable!()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn can_peer_oracles() {
         reth_tracing::init_test_tracing();
-        let (ctx, _handle) = test_exex_context().await.unwrap();
-        let (oracle, network_1) =
-            start(ctx, 30306, 30307, vec!["btcusdc".to_string(), "ethusdc".to_string()])
+
+        // spawn first instance
+        let (ctx_1, _handle) = test_exex_context().await.unwrap();
+        let (oracle_1, network_1) =
+            start(ctx_1, 30303, 30304, vec!["btcusdc".to_string(), "ethusdc".to_string()])
                 .await
                 .unwrap();
-        tokio::spawn(oracle);
+        tokio::spawn(oracle_1);
 
-        // // spawn second
-        // let (ctx, _handle) = test_exex_context().await.unwrap();
-        // let (oracle, network_2) =
-        //     start(ctx, 30308, 30309, vec!["btcusdc".to_string(), "ethusdc".to_string()])
-        //         .await
-        //         .unwrap();
-        // tokio::spawn(oracle);
+        // spawn second instance
+        let (ctx_2, _handle) = test_exex_context().await.unwrap();
+        let (oracle_2, network_2) =
+            start(ctx_2, 30305, 30306, vec!["btcusdc".to_string(), "ethusdc".to_string()])
+                .await
+                .unwrap();
+        tokio::spawn(oracle_2);
 
-        // // make them connect
-        // let (peer_1, addr_1) = (network_1.peer_id(), network_1.local_addr());
-        // let (peer_2, addr_2) = (network_2.peer_id(), network_2.local_addr());
-        // network_1.add_peer(*peer_1, addr_1);
-        // network_2.add_peer(*peer_2, addr_2);
+        // make them connect
+        let (peer_1, addr_1) = (network_1.peer_id(), network_1.local_addr());
+        let (peer_2, addr_2) = (network_2.peer_id(), network_2.local_addr());
 
-        // let mut events_1 = network_1.event_listener();
+        network_1.add_peer(*peer_2, addr_2);
+        let expected_peer_2 = wait_for_session(&network_1).await;
+        info!("Peer1 connected to peer2: {:?}", expected_peer_2);
+        assert_eq!(expected_peer_2, *peer_2);
 
-        // let expected_peer_2 = loop {
-        //     if let Some(ev) = events_1.next().await {
-        //         match ev {
-        //             NetworkEvent::SessionEstablished { peer_id, .. } => {
-        //                 info!("Session established with peer: {:?}", peer_id);
-        //                 break peer_id;
-        //             }
-        //             _ => continue,
-        //         }
-        //     } else {
-        //         unreachable!()
-        //     }
-        // };
-        // assert_eq!(expected_peer_2, *peer_2);
+        network_2.add_peer(*peer_1, addr_1);
+        let expected_peer_1 = wait_for_session(&network_2).await;
+        info!("Peer2 connected to peer1: {:?}", expected_peer_1);
+        assert_eq!(expected_peer_1, *peer_1);
     }
 }

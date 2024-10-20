@@ -8,7 +8,7 @@ use alloy_signer::SignerSync;
 use alloy_signer_local::PrivateKeySigner;
 use futures::{FutureExt, StreamExt};
 use reth_node_api::FullNodeComponents;
-use reth_tracing::tracing::{error, info};
+use reth_tracing::tracing::{error, info, trace};
 use std::{
     future::Future,
     pin::Pin,
@@ -74,8 +74,9 @@ impl<Node: FullNodeComponents> Future for Oracle<Node> {
                     let signature = this.signer.sign_message_sync(&buffer)?;
                     let signed_ticker = SignedTicker::new(ticker, signature, this.signer.address());
 
-                    if let Err(err) = this.to_peers.send(signed_ticker.clone()) {
-                        error!(?err, "Failed to send ticker to gossip, no peers connected");
+                    if let Ok(_) = this.to_peers.send(signed_ticker.clone()) {
+                        let signer = signed_ticker.signer;
+                        trace!(target: "oracle", ?signer, "Sent signed ticker");
                     }
                 }
                 Some(Err(e)) => {

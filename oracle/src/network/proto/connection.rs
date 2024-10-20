@@ -10,6 +10,7 @@ use reth_eth_wire::{
 use reth_network::protocol::{ConnectionHandler, OnNotSupported};
 use reth_network_api::Direction;
 use reth_network_peers::PeerId;
+use reth_tracing::tracing::trace;
 use std::{
     collections::HashMap,
     pin::Pin,
@@ -59,6 +60,8 @@ impl Stream for OracleConnection {
             }
 
             if let Poll::Ready(Some(Ok(tick))) = this.signed_ticks.poll_next_unpin(cx) {
+                let signer = tick.signer;
+                trace!(target: "oracle::conn", ?signer, "Received signed tick data.");
                 return Poll::Ready(Some(
                     OracleProtoMessage::signed_ticker(Box::new(tick)).encoded(),
                 ));
@@ -142,6 +145,7 @@ impl ConnectionHandler for OracleConnHandler {
             .events
             .send(ProtocolEvent::Established { direction, peer_id, to_connection: tx })
             .ok();
+        trace!(target: "oracle::conn", "Connection established.");
         OracleConnection {
             conn,
             initial_ping: direction.is_outgoing().then(OracleProtoMessage::ping),
