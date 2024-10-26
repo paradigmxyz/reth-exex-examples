@@ -74,7 +74,7 @@ impl<Node: FullNodeComponents> Future for Oracle<Node> {
                     let signature = this.signer.sign_message_sync(&buffer)?;
                     let signed_ticker = SignedTicker::new(ticker, signature, this.signer.address());
 
-                    if let Ok(_) = this.to_peers.send(signed_ticker.clone()) {
+                    if this.to_peers.send(signed_ticker.clone()).is_ok() {
                         let signer = signed_ticker.signer;
                         trace!(target: "oracle", ?signer, "Sent signed ticker");
                     }

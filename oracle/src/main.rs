@@ -87,28 +87,25 @@ mod tests {
     use crate::start;
     use futures::StreamExt;
     use reth_exex_test_utils::test_exex_context;
-    use reth_network::{
-        NetworkEvent, NetworkEventListenerProvider, NetworkHandle, NetworkInfo, Peers,
-    };
+    use reth_network::{NetworkEvent, NetworkEventListenerProvider, NetworkInfo, Peers};
     use reth_network_api::PeerId;
+    use reth_tokio_util::EventStream;
     use reth_tracing::tracing::info;
 
-    async fn wait_for_session(network: &NetworkHandle) -> PeerId {
-        let mut events = network.event_listener();
-
+    async fn wait_for_session(mut events: EventStream<NetworkEvent>) -> PeerId {
         while let Some(event) = events.next().await {
             if let NetworkEvent::SessionEstablished { peer_id, .. } = event {
                 info!("Session established with {}", peer_id);
                 return peer_id;
             }
-            //info!("Unexpected event: {:?}", event);
+            info!("Unexpected event: {:?}", event);
         }
 
         unreachable!()
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn can_peer_oracles() {
+    #[tokio::test]
+    async fn oracles_can_peer() {
         reth_tracing::init_test_tracing();
 
         // spawn first instance
@@ -118,6 +115,7 @@ mod tests {
                 .await
                 .unwrap();
         tokio::spawn(oracle_1);
+        let net_1_events = network_1.event_listener();
 
         // spawn second instance
         let (ctx_2, _handle) = test_exex_context().await.unwrap();
@@ -126,19 +124,17 @@ mod tests {
                 .await
                 .unwrap();
         tokio::spawn(oracle_2);
+        let net_2_events = network_2.event_listener();
 
-        // make them connect
-        let (peer_1, addr_1) = (network_1.peer_id(), network_1.local_addr());
+        // expect peers connected
         let (peer_2, addr_2) = (network_2.peer_id(), network_2.local_addr());
-
         network_1.add_peer(*peer_2, addr_2);
-        let expected_peer_2 = wait_for_session(&network_1).await;
-        info!("Peer1 connected to peer2: {:?}", expected_peer_2);
+        let expected_peer_2 = wait_for_session(net_1_events).await;
         assert_eq!(expected_peer_2, *peer_2);
 
+        let (peer_1, addr_1) = (network_1.peer_id(), network_1.local_addr());
         network_2.add_peer(*peer_1, addr_1);
-        let expected_peer_1 = wait_for_session(&network_2).await;
-        info!("Peer2 connected to peer1: {:?}", expected_peer_1);
+        let expected_peer_1 = wait_for_session(net_2_events).await;
         assert_eq!(expected_peer_1, *peer_1);
     }
 }
