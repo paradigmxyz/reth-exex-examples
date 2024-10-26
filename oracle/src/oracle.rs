@@ -46,6 +46,18 @@ where
     ) -> Self {
         Self { exex, network, data_feed, signer: PrivateKeySigner::random(), to_peers }
     }
+
+    /// Returns the signer used by the oracle.
+    #[allow(dead_code)]
+    pub(crate) fn signer(&self) -> &PrivateKeySigner {
+        &self.signer
+    }
+
+    /// Returns the signed ticker broadcast channel.
+    #[allow(dead_code)]
+    pub(crate) fn signed_ticks(&self) -> &tokio::sync::broadcast::Sender<SignedTicker> {
+        &self.to_peers
+    }
 }
 
 impl<Node: FullNodeComponents, D> Future for Oracle<Node, D>
