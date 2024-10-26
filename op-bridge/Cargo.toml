@@ -18,6 +18,7 @@ reth.workspace = true
 # alloy
 alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
+alloy-eips.workspace = true
 
 # misc
 eyre.workspace = true

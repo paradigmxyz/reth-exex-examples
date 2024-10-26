@@ -28,7 +28,7 @@ alloy-signer-local.workspace = true
 alloy-signer.workspace = true
 
 # networking
-discv5 = "0.7"
+discv5.workspace = true
 enr = "0.12"
 
 # async

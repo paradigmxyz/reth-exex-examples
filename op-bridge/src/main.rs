@@ -273,6 +273,7 @@ mod tests {
     use std::pin::pin;
 
     use alloy_consensus::TxLegacy;
+    use alloy_eips::eip7685::Requests;
     use alloy_primitives::{Address, TxKind, U256};
     use alloy_sol_types::SolEvent;
     use reth::revm::db::BundleState;
@@ -360,7 +361,7 @@ mod tests {
                 BundleState::default(),
                 vec![deposit_tx_receipt, withdrawal_tx_receipt].into(),
                 block.number,
-                vec![block.body.requests.clone().unwrap_or_default()],
+                vec![Requests::default()],
             ),
             None,
         );
