@@ -20,44 +20,24 @@ publish = false
 
 [workspace.dependencies]
 # reth
-# reth = { git = "https://github.com/paradigmxyz/reth" }
-# reth-chainspec = { git = "https://github.com/paradigmxyz/reth" }
-# reth-discv5 = { git = "https://github.com/paradigmxyz/reth" }
-# reth-execution-errors = { git = "https://github.com/paradigmxyz/reth" }
-# reth-execution-types = { git = "https://github.com/paradigmxyz/reth" }
-# reth-exex = { git = "https://github.com/paradigmxyz/reth", features = ["serde"] }
-# reth-eth-wire = { git = "https://github.com/paradigmxyz/reth" }
-# reth-evm = { git = "https://github.com/paradigmxyz/reth" }
-# reth-network = { git = "https://github.com/paradigmxyz/reth", features = ["test-utils"] }
-# reth-network-api = { git = "https://github.com/paradigmxyz/reth" }
-# reth-network-peers = { git = "https://github.com/paradigmxyz/reth" }
-# reth-node-api = { git = "https://github.com/paradigmxyz/reth" }
-# reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth" }
-# reth-primitives = { git = "https://github.com/paradigmxyz/reth" }
-# reth-provider = { git = "https://github.com/paradigmxyz/reth" }
-# reth-revm = { git = "https://github.com/paradigmxyz/reth" }
-# reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth" }
-# reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
-
-# reth
-reth = { path = "../reth/bin/reth" }
-reth-chainspec = { path = "../reth/crates/chainspec" }
-reth-discv5 = { path = "../reth/crates/net/discv5" }
-reth-execution-errors = { path = "../reth/crates/evm/execution-errors" }
-reth-execution-types = { path = "../reth/crates/evm/execution-types" }
-reth-exex = { path = "../reth/crates/exex/exex" , features = ["serde"] }
-reth-eth-wire = { path = "../reth/crates/net/eth-wire" }
-reth-evm = { path = "../reth/crates/evm" }
-reth-network = { path = "../reth/crates/net/network", features = ["test-utils"] }
-reth-network-api = { path = "../reth/crates/net/network-api"  }
-reth-network-peers = { path = "../reth/crates/net/peers"  }
-reth-node-api = { path = "../reth/crates/node/api"  }
-reth-node-ethereum = { path = "../reth/crates/ethereum/node"  }
-reth-primitives = { path = "../reth/crates/primitives"  }
-reth-provider =  { path = "../reth/crates/storage/provider"  }
-reth-revm = { path = "../reth/crates/revm"  }
-reth-transaction-pool = { path = "../reth/crates/transaction-pool"  }
-reth-tracing = { path = "../reth/crates/tracing"  }
+reth = { git = "https://github.com/paradigmxyz/reth" }
+reth-chainspec = { git = "https://github.com/paradigmxyz/reth" }
+reth-discv5 = { git = "https://github.com/paradigmxyz/reth" }
+reth-execution-errors = { git = "https://github.com/paradigmxyz/reth" }
+reth-execution-types = { git = "https://github.com/paradigmxyz/reth" }
+reth-exex = { git = "https://github.com/paradigmxyz/reth", features = ["serde"] }
+reth-eth-wire = { git = "https://github.com/paradigmxyz/reth" }
+reth-evm = { git = "https://github.com/paradigmxyz/reth" }
+reth-network = { git = "https://github.com/paradigmxyz/reth", features = ["test-utils"] }
+reth-network-api = { git = "https://github.com/paradigmxyz/reth" }
+reth-network-peers = { git = "https://github.com/paradigmxyz/reth" }
+reth-node-api = { git = "https://github.com/paradigmxyz/reth" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth" }
+reth-provider = { git = "https://github.com/paradigmxyz/reth" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth" }
+reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth" }
+reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
 
 
 # alloy
@@ -88,9 +68,8 @@ serde_json = "1"
 eyre = "0.6"
 
 # testing
-# reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth" }
-# reth-testing-utils = { git = "https://github.com/paradigmxyz/reth" }
+reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth" }
+reth-testing-utils = { git = "https://github.com/paradigmxyz/reth" }
 
-reth-testing-utils = { path = "../reth/testing/testing-utils"  }
-reth-exex-test-utils = { path = "../reth/crates/exex/test-utils" }
+
  
