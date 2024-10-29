@@ -39,7 +39,6 @@ reth-revm = { git = "https://github.com/paradigmxyz/reth" }
 reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth" }
 reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
 
-
 # alloy
 alloy-eips = { version = "0.5.4", default-features = false }
 alloy-consensus = { version = "0.5.4", default-features = false }
