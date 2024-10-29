@@ -1,6 +1,8 @@
 use crate::{db::Database, Zenith, CHAIN_ID, CHAIN_SPEC};
-use alloy_consensus::{Blob, SidecarCoder, SimpleCoder};
-use alloy_eips::{eip2718::Decodable2718, eip4844::kzg_to_versioned_hash};
+use alloy_consensus::{Blob, SidecarCoder, SimpleCoder, Transaction};
+use alloy_eips::{
+    eip1559::INITIAL_BASE_FEE, eip2718::Decodable2718, eip4844::kzg_to_versioned_hash,
+};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_rlp::Decodable as _;
 use eyre::OptionExt;
@@ -9,7 +11,6 @@ use reth_execution_errors::BlockValidationError;
 use reth_node_api::{ConfigureEvm, ConfigureEvmEnv};
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{
-    constants,
     revm_primitives::{CfgEnvWithHandlerCfg, EVMError, ExecutionResult, ResultAndState},
     Block, BlockBody, BlockWithSenders, EthereumHardfork, Header, Receipt, TransactionSigned,
     TxType,
@@ -71,7 +72,7 @@ fn construct_header(db: &Database, header: &Zenith::BlockHeader) -> eyre::Result
     // Calculate base fee per gas for EIP-1559 transactions
     let base_fee_per_gas =
         if CHAIN_SPEC.fork(EthereumHardfork::London).transitions_at_block(block_number) {
-            constants::EIP1559_INITIAL_BASE_FEE
+            INITIAL_BASE_FEE
         } else {
             parent_block
                 .as_ref()
@@ -263,12 +264,11 @@ fn execute_transactions(
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use alloy_consensus::{SidecarBuilder, SimpleCoder, TxEip2930};
+    use alloy_consensus::{constants::ETH_TO_WEI, SidecarBuilder, SimpleCoder, TxEip2930};
     use alloy_eips::eip2718::Encodable2718;
     use alloy_primitives::{bytes, keccak256, BlockNumber, TxKind, U256};
     use alloy_sol_types::{sol, SolCall};
     use reth_primitives::{
-        constants::ETH_TO_WEI,
         public_key_to_address,
         revm_primitives::{AccountInfo, ExecutionResult, Output, TxEnv},
         Receipt, SealedBlockWithSenders, Transaction,

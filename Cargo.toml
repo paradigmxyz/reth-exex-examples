@@ -14,7 +14,7 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.81"
+rust-version = "1.82"
 license = "MIT OR Apache-2.0"
 publish = false
 
@@ -40,14 +40,18 @@ reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth" }
 reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
 
 # alloy
-alloy-eips = "0.4"
-alloy-consensus = "0.4"
-alloy-primitives = "0.8"
-alloy-rlp = "0.3"
-alloy-rpc-types = "0.4"
-alloy-signer = "0.4"
-alloy-signer-local = "0.4"
-alloy-sol-types = { version = "0.8", features = ["json"] }
+alloy-eips = { version = "0.5.4", default-features = false }
+alloy-consensus = { version = "0.5.4", default-features = false }
+alloy-primitives = { version = "0.8.9", default-features = false }
+alloy-rlp = "0.3.4"
+alloy-rpc-types = { version = "0.5.4", features = [
+    "eth",
+], default-features = false }
+alloy-signer = { version = "0.5.4", default-features = false }
+alloy-signer-local = { version = "0.5.4", default-features = false }
+alloy-sol-types  = { version = "0.8", features = ["json"] }
+
+discv5 = "0.8"
 
 # async
 futures = "0.3"
