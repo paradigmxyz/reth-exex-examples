@@ -1,5 +1,5 @@
 use futures::{ready, Stream, StreamExt};
-use reth_tracing::tracing::error;
+use reth_tracing::tracing::{error, trace};
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -96,7 +96,7 @@ impl Stream for BinanceDataFeeder {
                         return Poll::Pending;
                     }
                 };
-
+                trace!(target: "oracle::binance", ?msg, "Received message");
                 Poll::Ready(Some(Ok(msg.data)))
             }
             Some(Err(e)) => {

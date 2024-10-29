@@ -19,6 +19,7 @@ reth-node-ethereum.workspace = true
 reth-primitives.workspace = true
 reth-tracing.workspace = true
 reth.workspace = true
+reth-tokio-util = { git = "https://github.com/paradigmxyz/reth" }
 
 # alloy
 alloy-primitives.workspace = true
@@ -34,17 +35,19 @@ enr = "0.12"
 # async
 futures.workspace = true
 tokio-stream.workspace = true
-tokio-tungstenite = "0.23"
+tokio-tungstenite.workspace = true
 tokio.workspace = true
+
 
 # misc
 clap = "4" 
 eyre.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-thiserror = "1"
 uuid = "1.10.0"
+rand = "0.8.5"
+thiserror = "1"
 
 [dev-dependencies]
-reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth" }
-reth-testing-utils = { git = "https://github.com/paradigmxyz/reth" }
+reth-exex-test-utils.workspace = true
+reth-testing-utils.workspace = true
