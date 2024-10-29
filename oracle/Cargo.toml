@@ -35,11 +35,9 @@ enr = "0.12"
 # async
 futures.workspace = true
 tokio-stream.workspace = true
-tokio-tungstenite = { version = "0.23", features = ["native-tls"] }
+tokio-tungstenite.workspace = true
 tokio.workspace = true
-rand = "0.8.5"
 
-thiserror = "1"
 
 # misc
 clap = "4" 
@@ -47,6 +45,8 @@ eyre.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid = "1.10.0"
+rand = "0.8.5"
+thiserror = "1"
 
 [dev-dependencies]
 reth-exex-test-utils.workspace = true
