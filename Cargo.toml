@@ -69,6 +69,3 @@ eyre = "0.6"
 # testing
 reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth" }
 reth-testing-utils = { git = "https://github.com/paradigmxyz/reth" }
-
-
- 
