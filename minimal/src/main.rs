@@ -22,13 +22,13 @@ async fn exex<Node: FullNodeComponents>(mut ctx: ExExContext<Node>) -> eyre::Res
     while let Some(notification) = ctx.notifications.try_next().await? {
         match &notification {
             ExExNotification::ChainCommitted { new } => {
-                info!(committed_chain = ?new.range(), "Received commit");
+                info!("Received commit");
             }
             ExExNotification::ChainReorged { old, new } => {
-                info!(from_chain = ?old.range(), to_chain = ?new.range(), "Received reorg");
+                info!("Received reorg");
             }
             ExExNotification::ChainReverted { old } => {
-                info!(reverted_chain = ?old.range(), "Received revert");
+                info!("Received revert");
             }
         };
 

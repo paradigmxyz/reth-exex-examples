@@ -1,0 +1,30 @@
+[package]
+name = "devcon"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+reth.workspace = true
+reth-exex.workspace = true
+reth-node-api.workspace = true
+reth-node-ethereum.workspace = true
+reth-tracing.workspace = true
+reth-execution-types.workspace = true
+
+alloy-primitives.workspace = true
+alloy-sol-macro = "0.8"
+alloy-sol-types.workspace = true
+
+async-trait = "0.1"
+eyre.workspace = true
+futures.workspace = true
+jsonrpsee = { version = "0.24", features = ["server", "macros"] }
+rusqlite = { version = "0.31.0", features = ["bundled"] }
+serde_json.workspace = true
+
+[dev-dependencies]
+reth-exex-test-utils.workspace = true
+
+tokio.workspace = true

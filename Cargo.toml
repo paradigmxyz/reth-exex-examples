@@ -1,6 +1,7 @@
 [workspace]
 members = [
  "backfill",
+ "devcon",
  "discv5",
  "in-memory-state",
  "minimal",

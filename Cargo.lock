@@ -2294,6 +2294,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "devcon"
+version = "0.0.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-macro",
+ "alloy-sol-types",
+ "async-trait",
+ "eyre",
+ "futures",
+ "jsonrpsee",
+ "reth",
+ "reth-execution-types",
+ "reth-exex",
+ "reth-exex-test-utils",
+ "reth-node-api",
+ "reth-node-ethereum",
+ "reth-tracing",
+ "rusqlite",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
