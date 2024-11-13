@@ -65,9 +65,9 @@ async fn exex<Node: FullNodeComponents>(
                             {
                                 // Insert the deposit event into the database
                                 let args = rusqlite::params![
-                                    tx.hash().to_string(),
+                                    tx.recalculate_hash().to_string(),
                                     tx.recover_signer().unwrap().to_string(),
-                                    deposit.amount.to_string()
+                                    u64::from_le_bytes(deposit.amount[..].try_into()?).to_string()
                                 ];
                                 connection.execute(
                                 r#"INSERT INTO deposits (tx_hash, "from", amount) VALUES (?1, ?2, ?3) ON CONFLICT DO NOTHING"#,
@@ -118,9 +118,9 @@ impl DevconRpcExtApiServer for DevconRpcExt {
         let depositors = stmt
             .query_map([count], |row| {
                 let from: String = row.get(0)?;
-                let amount: String = row.get(1)?;
+                let amount: u64 = row.get(1)?;
 
-                Ok((Address::from_str(&from).unwrap(), U256::from_str(&amount).unwrap()))
+                Ok((Address::from_str(&from).unwrap(), U256::from(amount)))
             })
             .unwrap()
             .collect::<Result<Vec<_>, _>>()
