@@ -17,7 +17,7 @@ use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
 
-const DEPOSIT_CONTRACT_ADDRESS: Address = address!("00000000219ab540356cBB839Cbe05303d7705Fa");
+const DEPOSIT_CONTRACT_ADDRESS: Address = address!("4242424242424242424242424242424242424242");
 
 sol! {
     event DepositEvent(
@@ -138,7 +138,6 @@ fn main() -> eyre::Result<()> {
             r#"
             CREATE TABLE IF NOT EXISTS deposits (
                 id               INTEGER PRIMARY KEY,
-                block_number     INTEGER NOT NULL,
                 tx_hash          TEXT NOT NULL UNIQUE,
                 "from"           TEXT NOT NULL,
                 amount           TEXT NOT NULL
