@@ -70,7 +70,7 @@ async fn exex<Node: FullNodeComponents>(
                                     deposit.amount.to_string()
                                 ];
                                 connection.execute(
-                                r#"INSERT INTO deposits (tx_hash, "from", amount) VALUES (?1, ?2, ?3)"#,
+                                r#"INSERT INTO deposits (tx_hash, "from", amount) VALUES (?1, ?2, ?3) ON CONFLICT DO NOTHING"#,
                                 args,
                             )?;
                             }
