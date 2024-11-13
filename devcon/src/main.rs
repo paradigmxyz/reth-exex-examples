@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use alloy_primitives::{address, Address, U256};
+use alloy_primitives::{address, Address};
 use alloy_sol_macro::sol;
 use alloy_sol_types::SolEvent;
 use async_trait::async_trait;
@@ -89,7 +89,7 @@ async fn exex<Node: FullNodeComponents>(
 #[rpc(server, namespace = "devcon")]
 trait DevconRpcExtApi {
     #[method(name = "depositors")]
-    async fn depositors(&self, count: usize) -> RpcResult<Vec<(Address, U256)>>;
+    async fn depositors(&self, count: usize) -> RpcResult<Vec<(Address, u64)>>;
 }
 
 pub struct DevconRpcExt {
@@ -98,7 +98,7 @@ pub struct DevconRpcExt {
 
 #[async_trait]
 impl DevconRpcExtApiServer for DevconRpcExt {
-    async fn depositors(&self, count: usize) -> RpcResult<Vec<(Address, U256)>> {
+    async fn depositors(&self, count: usize) -> RpcResult<Vec<(Address, u64)>> {
         let connection = self.connection.lock().unwrap();
 
         // Query depositors from highest to lowest by total amount
@@ -120,7 +120,7 @@ impl DevconRpcExtApiServer for DevconRpcExt {
                 let from: String = row.get(0)?;
                 let amount: u64 = row.get(1)?;
 
-                Ok((Address::from_str(&from).unwrap(), U256::from(amount)))
+                Ok((Address::from_str(&from).unwrap(), amount))
             })
             .unwrap()
             .collect::<Result<Vec<_>, _>>()
