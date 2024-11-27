@@ -112,15 +112,17 @@ dependencies = [
 
 [[package]]
 name = "alloy-consensus"
-version = "0.3.6"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "629b62e38d471cc15fea534eb7283d2f8a4e8bdb1811bcc5d66dda6cfce6fae1"
+checksum = "705687d5bfd019fee57cf9e206b27b30a9a9617535d5590a02b171e813208f8e"
 dependencies = [
- "alloy-eips 0.3.6",
+ "alloy-eips 0.4.2",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde 0.3.6",
+ "alloy-serde 0.4.2",
+ "auto_impl",
  "c-kzg",
+ "derive_more",
  "serde",
 ]
 
@@ -204,15 +206,15 @@ dependencies = [
 
 [[package]]
 name = "alloy-eips"
-version = "0.3.6"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f923dd5fca5f67a43d81ed3ebad0880bd41f6dd0ada930030353ac356c54cd0f"
+checksum = "6ffb906284a1e1f63c4607da2068c8197458a352d0b3e9796e67353d72a9be85"
 dependencies = [
  "alloy-eip2930",
  "alloy-eip7702 0.1.1",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde 0.3.6",
+ "alloy-serde 0.4.2",
  "c-kzg",
  "derive_more",
  "once_cell",
@@ -301,13 +303,14 @@ dependencies = [
 
 [[package]]
 name = "alloy-network-primitives"
-version = "0.3.6"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94ad40869867ed2d9cd3842b1e800889e5b49e6b92da346e93862b4a741bedf3"
+checksum = "801492711d4392b2ccf5fc0bc69e299fa1aab15167d74dcaa9aab96a54f684bd"
 dependencies = [
- "alloy-eips 0.3.6",
+ "alloy-consensus 0.4.2",
+ "alloy-eips 0.4.2",
  "alloy-primitives",
- "alloy-serde 0.3.6",
+ "alloy-serde 0.4.2",
  "serde",
 ]
 
@@ -543,20 +546,18 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-eth"
-version = "0.3.6"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83aa984386deda02482660aa31cb8ca1e63d533f1c31a52d7d181ac5ec68e9b8"
+checksum = "413f4aa3ccf2c3e4234a047c5fa4727916d7daf25a89f9b765df0ba09784fd87"
 dependencies = [
- "alloy-consensus 0.3.6",
- "alloy-eips 0.3.6",
- "alloy-network-primitives 0.3.6",
+ "alloy-consensus 0.4.2",
+ "alloy-eips 0.4.2",
+ "alloy-network-primitives 0.4.2",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde 0.3.6",
+ "alloy-serde 0.4.2",
  "alloy-sol-types",
- "cfg-if",
  "derive_more",
- "hashbrown 0.14.5",
  "itertools 0.13.0",
  "serde",
  "serde_json",
@@ -624,9 +625,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-serde"
-version = "0.3.6"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "731f75ec5d383107fd745d781619bd9cedf145836c51ecb991623d41278e71fa"
+checksum = "9dff0ab1cdd43ca001e324dc27ee0e8606bd2161d6623c63e0e0b8c4dfc13600"
 dependencies = [
  "alloy-primitives",
  "serde",
@@ -1328,6 +1329,22 @@ name = "bit-vec"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
+
+[[package]]
+name = "bitcoin-io"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b47c4ab7a93edb0c7198c5535ed9b52b63095f4e9b45279c6736cec4b856baf"
+
+[[package]]
+name = "bitcoin_hashes"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb18c03d0db0247e147a21a6faafd5a7eb851c743db062de72018b6b7e8e4d16"
+dependencies = [
+ "bitcoin-io",
+ "hex-conservative",
+]
 
 [[package]]
 name = "bitflags"
@@ -2558,7 +2575,7 @@ dependencies = [
  "k256",
  "log",
  "rand",
- "secp256k1",
+ "secp256k1 0.29.1",
  "serde",
  "sha3",
  "zeroize",
@@ -2771,15 +2788,15 @@ dependencies = [
 
 [[package]]
 name = "foundry-blob-explorers"
-version = "0.7.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3944195dd4b8aa2312a67895f7b77f217cd49e0e0b38bef3c0d5dcf29b1722e2"
+checksum = "2ffc15e1cf3e82577d1aad53975a7e42b883d1f232bdc5b545de6e6037f22c1e"
 dependencies = [
  "alloy-chains",
- "alloy-eips 0.3.6",
+ "alloy-eips 0.4.2",
  "alloy-primitives",
- "alloy-rpc-types-eth 0.3.6",
- "alloy-serde 0.3.6",
+ "alloy-rpc-types-eth 0.4.2",
+ "alloy-serde 0.4.2",
  "chrono",
  "reqwest",
  "serde",
@@ -3054,7 +3071,6 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 dependencies = [
  "ahash",
  "allocator-api2",
- "serde",
 ]
 
 [[package]]
@@ -3107,6 +3123,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "hex-conservative"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5313b072ce3c597065a808dbf612c4c8e8590bdbf8b579508bf7a762c5eae6cd"
+dependencies = [
+ "arrayvec",
 ]
 
 [[package]]
@@ -4130,9 +4155,9 @@ dependencies = [
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.28.0"
+version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c10584274047cb335c23d3e61bcef8e323adae7c5c8c760540f73610177fc3f"
+checksum = "2e99fb7a497b1e3339bc746195567ed8d3e24945ecd636e3619d20b9de9e9149"
 dependencies = [
  "cc",
  "pkg-config",
@@ -5966,7 +5991,7 @@ dependencies = [
  "reth-static-file-types",
  "reth-trie",
  "reth-trie-db",
- "secp256k1",
+ "secp256k1 0.29.1",
  "serde",
  "serde_json",
  "tokio",
@@ -5996,7 +6021,7 @@ dependencies = [
  "libc",
  "rand",
  "reth-fs-util",
- "secp256k1",
+ "secp256k1 0.29.1",
  "serde",
  "thiserror 1.0.69",
  "tikv-jemallocator",
@@ -6219,7 +6244,7 @@ dependencies = [
  "reth-net-nat",
  "reth-network-peers",
  "schnellru",
- "secp256k1",
+ "secp256k1 0.29.1",
  "serde",
  "thiserror 1.0.69",
  "tokio",
@@ -6245,7 +6270,7 @@ dependencies = [
  "reth-ethereum-forks",
  "reth-metrics",
  "reth-network-peers",
- "secp256k1",
+ "secp256k1 0.29.1",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -6265,7 +6290,7 @@ dependencies = [
  "reth-network-peers",
  "reth-tokio-util",
  "schnellru",
- "secp256k1",
+ "secp256k1 0.29.1",
  "serde",
  "serde_with",
  "thiserror 1.0.69",
@@ -6330,7 +6355,7 @@ dependencies = [
  "pin-project",
  "rand",
  "reth-network-peers",
- "secp256k1",
+ "secp256k1 0.29.1",
  "sha2 0.10.8",
  "sha3",
  "thiserror 1.0.69",
@@ -6982,7 +7007,7 @@ dependencies = [
  "reth-transaction-pool",
  "rustc-hash 2.0.0",
  "schnellru",
- "secp256k1",
+ "secp256k1 0.29.1",
  "serde",
  "smallvec",
  "tempfile",
@@ -7047,7 +7072,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "enr 0.12.1",
- "secp256k1",
+ "secp256k1 0.29.1",
  "serde_with",
  "thiserror 1.0.69",
  "tokio",
@@ -7166,7 +7191,7 @@ dependencies = [
  "reth-tracing",
  "reth-transaction-pool",
  "revm-primitives",
- "secp256k1",
+ "secp256k1 0.29.1",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -7211,7 +7236,7 @@ dependencies = [
  "reth-storage-errors",
  "reth-tracing",
  "reth-transaction-pool",
- "secp256k1",
+ "secp256k1 0.29.1",
  "serde",
  "shellexpand",
  "strum",
@@ -7430,7 +7455,7 @@ dependencies = [
  "reth-primitives-traits",
  "reth-static-file-types",
  "revm-primitives",
- "secp256k1",
+ "secp256k1 0.29.1",
  "serde",
  "serde_with",
  "zstd",
@@ -8044,7 +8069,7 @@ dependencies = [
  "alloy-primitives",
  "rand",
  "reth-primitives",
- "secp256k1",
+ "secp256k1 0.29.1",
 ]
 
 [[package]]
@@ -8275,7 +8300,7 @@ dependencies = [
  "once_cell",
  "revm-primitives",
  "ripemd",
- "secp256k1",
+ "secp256k1 0.29.1",
  "sha2 0.10.8",
  "substrate-bn",
 ]
@@ -8429,7 +8454,7 @@ dependencies = [
  "reth-tracing",
  "reth-transaction-pool",
  "rusqlite",
- "secp256k1",
+ "secp256k1 0.30.0",
  "serde_json",
  "tokio",
 ]
@@ -8473,9 +8498,9 @@ checksum = "48fd7bd8a6377e15ad9d42a8ec25371b94ddc67abe7c8b9127bec79bebaaae18"
 
 [[package]]
 name = "rusqlite"
-version = "0.31.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b838eba278d213a8beaf485bd313fd580ca4505a00d5871caeb1457c55322cae"
+checksum = "7753b721174eb8ff87a9a0e799e2d7bc3749323e773db92e0984debb00019d6e"
 dependencies = [
  "bitflags 2.6.0",
  "fallible-iterator",
@@ -8715,6 +8740,17 @@ dependencies = [
  "rand",
  "secp256k1-sys",
  "serde",
+]
+
+[[package]]
+name = "secp256k1"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b50c5943d326858130af85e049f2661ba3c78b26589b8ab98e65e80ae44a1252"
+dependencies = [
+ "bitcoin_hashes",
+ "rand",
+ "secp256k1-sys",
 ]
 
 [[package]]
