@@ -1,11 +1,12 @@
 use alloy_primitives::{address, Address};
 use alloy_sol_types::{sol, SolEventInterface};
 use futures::{Future, FutureExt, TryStreamExt};
+use reth::providers::BlockReader;
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
-use reth_primitives::{Log, SealedBlockWithSenders, TransactionSigned};
+use reth_primitives::{Block, Log, SealedBlockWithSenders, TransactionSigned};
 use reth_tracing::tracing::info;
 use rusqlite::Connection;
 
@@ -24,7 +25,7 @@ const OP_BRIDGES: [Address; 6] = [
 /// Initializes the ExEx.
 ///
 /// Opens up a SQLite database and creates the tables (if they don't exist).
-async fn init<Node: FullNodeComponents>(
+async fn init<Node: FullNodeComponents<Provider: BlockReader<Block = Block>>>(
     ctx: ExExContext<Node>,
     mut connection: Connection,
 ) -> eyre::Result<impl Future<Output = eyre::Result<()>>> {
@@ -98,7 +99,7 @@ fn create_tables(connection: &mut Connection) -> rusqlite::Result<()> {
 
 /// An example of ExEx that listens to ETH bridging events from OP Stack chains
 /// and stores deposits and withdrawals in a SQLite database.
-async fn op_bridge_exex<Node: FullNodeComponents>(
+async fn op_bridge_exex<Node: FullNodeComponents<Provider: BlockReader<Block = Block>>>(
     mut ctx: ExExContext<Node>,
     connection: Connection,
 ) -> eyre::Result<()> {
@@ -219,7 +220,8 @@ fn decode_chain_into_events(
         .flat_map(|(block, receipts)| {
             block
                 .body
-                .transactions()
+                .transactions
+                .iter()
                 .zip(receipts.iter().flatten())
                 .map(move |(tx, receipt)| (block, tx, receipt))
         })
@@ -280,7 +282,7 @@ mod tests {
     use reth_execution_types::{Chain, ExecutionOutcome};
     use reth_exex_test_utils::{test_exex_context, PollOnce};
     use reth_primitives::{
-        Block, BlockBody, Header, Log, Receipt, Transaction, TransactionSigned, TxType,
+        Block, BlockBody, BlockExt, Header, Log, Receipt, Transaction, TransactionSigned, TxType,
     };
     use reth_testing_utils::generators::sign_tx_with_random_key_pair;
     use rusqlite::Connection;
@@ -351,7 +353,7 @@ mod tests {
             body: BlockBody { transactions: vec![deposit_tx, withdrawal_tx], ..Default::default() },
         }
         .seal_slow()
-        .seal_with_senders()
+        .seal_with_senders::<Block>()
         .ok_or_else(|| eyre::eyre!("failed to recover senders"))?;
 
         // Construct a chain

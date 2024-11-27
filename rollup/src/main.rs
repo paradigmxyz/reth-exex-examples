@@ -4,6 +4,7 @@
 //! The rollup contract accepts blocks of transactions and deposits of ETH and is deployed on
 //! Holesky at [ROLLUP_CONTRACT_ADDRESS], see <https://github.com/init4tech/zenith/blob/e0481e930947513166881a83e276b316c2f38502/src/Zenith.sol>.
 
+use alloy_consensus::Transaction;
 use alloy_genesis::Genesis;
 use alloy_primitives::{address, Address, U256};
 use alloy_sol_types::{sol, SolEventInterface, SolInterface};
@@ -16,7 +17,8 @@ use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
-use reth_primitives::{SealedBlockWithSenders, TransactionSigned};
+use reth_primitives::{Block, SealedBlockWithSenders, TransactionSigned};
+use reth_provider::BlockReader;
 use reth_tracing::tracing::{error, info};
 use rusqlite::Connection;
 use std::sync::Arc;
@@ -46,7 +48,7 @@ struct Rollup<Node: FullNodeComponents> {
     db: Database,
 }
 
-impl<Node: FullNodeComponents> Rollup<Node> {
+impl<Node: FullNodeComponents<Provider: BlockReader<Block = Block>>> Rollup<Node> {
     fn new(ctx: ExExContext<Node>, connection: Connection) -> eyre::Result<Self> {
         let db = Database::new(connection)?;
         Ok(Self { ctx, db })
@@ -242,7 +244,8 @@ fn decode_chain_into_rollup_events(
         .flat_map(|(block, receipts)| {
             block
                 .body
-                .transactions()
+                .transactions
+                .iter()
                 .zip(receipts.iter().flatten())
                 .map(move |(tx, receipt)| (block, tx, receipt))
         })

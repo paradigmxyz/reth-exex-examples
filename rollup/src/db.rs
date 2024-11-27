@@ -5,14 +5,14 @@ use std::{
 };
 
 use alloy_primitives::{Address, Bytes, B256, U256};
-use reth_primitives::{
-    revm_primitives::{AccountInfo, Bytecode},
-    SealedBlockWithSenders, StorageEntry,
-};
+use reth_primitives::{SealedBlockWithSenders, StorageEntry};
 use reth_provider::{bundle_state::StorageRevertsIter, OriginalValuesKnown};
-use reth_revm::db::{
-    states::{PlainStorageChangeset, PlainStorageRevert},
-    BundleState,
+use reth_revm::{
+    db::{
+        states::{PlainStorageChangeset, PlainStorageRevert},
+        BundleState,
+    },
+    primitives::{AccountInfo, Bytecode},
 };
 use rusqlite::Connection;
 
@@ -99,7 +99,7 @@ impl Database {
             (block.header.number.to_string(), serde_json::to_string(block)?),
         )?;
 
-        let (changeset, reverts) = bundle.into_plain_state_and_reverts(OriginalValuesKnown::Yes);
+        let (changeset, reverts) = bundle.to_plain_state_and_reverts(OriginalValuesKnown::Yes);
 
         for (address, account) in changeset.accounts {
             if let Some(account) = account {

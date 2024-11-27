@@ -11,12 +11,12 @@ use reth_execution_errors::BlockValidationError;
 use reth_node_api::{ConfigureEvm, ConfigureEvmEnv};
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{
-    revm_primitives::{CfgEnvWithHandlerCfg, EVMError, ExecutionResult, ResultAndState},
-    Block, BlockBody, BlockWithSenders, EthereumHardfork, Header, Receipt, TransactionSigned,
-    TxType,
+    Block, BlockBody, BlockExt, BlockWithSenders, EthereumHardfork, Header, Receipt,
+    TransactionSigned, TxType,
 };
 use reth_revm::{
     db::{states::bundle_state::BundleRetention, BundleState},
+    primitives::{CfgEnvWithHandlerCfg, EVMError, ExecutionResult, ResultAndState},
     DBBox, DatabaseCommit, Evm, StateBuilder, StateDBBox,
 };
 use reth_tracing::tracing::debug;
@@ -127,13 +127,13 @@ async fn decode_transactions<Pool: TransactionPool>(
 ) -> eyre::Result<Vec<(TransactionSigned, Address)>> {
     // Get raw transactions either from the blobs, or directly from the block data
     let raw_transactions = if matches!(tx.tx_type(), TxType::Eip4844) {
-        let blobs: Vec<_> = if let Some(sidecar) = pool.get_blob(tx.hash)? {
+        let blobs: Vec<_> = if let Some(sidecar) = pool.get_blob(tx.hash())? {
             // Try to get blobs from the transaction pool
-            sidecar.blobs.into_iter().zip(sidecar.commitments).collect()
+            sidecar.blobs.clone().into_iter().zip(sidecar.commitments.clone()).collect()
         } else {
             // If transaction is not found in the pool, try to get blobs from Blobscan
             let blobscan_client = foundry_blob_explorers::Client::holesky();
-            let sidecar = blobscan_client.transaction(tx.hash).await?.blob_sidecar();
+            let sidecar = blobscan_client.transaction(tx.hash()).await?.blob_sidecar();
             sidecar
                 .blobs
                 .into_iter()
@@ -268,12 +268,11 @@ mod tests {
     use alloy_eips::eip2718::Encodable2718;
     use alloy_primitives::{bytes, keccak256, BlockNumber, TxKind, U256};
     use alloy_sol_types::{sol, SolCall};
-    use reth_primitives::{
-        public_key_to_address,
-        revm_primitives::{AccountInfo, ExecutionResult, Output, TxEnv},
-        Receipt, SealedBlockWithSenders, Transaction,
+    use reth_primitives::{public_key_to_address, Receipt, SealedBlockWithSenders, Transaction};
+    use reth_revm::{
+        primitives::{AccountInfo, ExecutionResult, Output, TxEnv},
+        Evm,
     };
-    use reth_revm::Evm;
     use reth_testing_utils::generators::{self, sign_tx_with_key_pair};
     use reth_transaction_pool::{
         test_utils::{testing_pool, MockTransaction},
@@ -459,7 +458,7 @@ mod tests {
                 let mut mock_transaction = MockTransaction::eip4844_with_sidecar(sidecar);
                 let transaction =
                     sign_tx_with_key_pair(key_pair, Transaction::from(mock_transaction.clone()));
-                mock_transaction.set_hash(transaction.hash);
+                mock_transaction.set_hash(transaction.hash());
                 pool.add_transaction(TransactionOrigin::Local, mock_transaction).await?;
                 (blob_hashes, transaction)
             }
