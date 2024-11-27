@@ -9,8 +9,9 @@ use futures::{FutureExt, StreamExt, TryStreamExt};
 use jsonrpsee::tracing::instrument;
 use reth::{
     chainspec::EthereumChainSpecParser,
-    primitives::{BlockId, BlockNumberOrTag},
+    primitives::Block,
     providers::{BlockIdReader, BlockReader, HeaderProvider, StateProviderFactory},
+    rpc::types::{BlockId, BlockNumberOrTag},
 };
 use reth_evm::execute::BlockExecutorProvider;
 use reth_execution_types::Chain;
@@ -55,7 +56,7 @@ struct BackfillExEx<Node: FullNodeComponents> {
     backfill_jobs: HashMap<u64, oneshot::Sender<oneshot::Sender<()>>>,
 }
 
-impl<Node: FullNodeComponents> BackfillExEx<Node> {
+impl<Node: FullNodeComponents<Provider: BlockReader<Block = Block>>> BackfillExEx<Node> {
     /// Creates a new instance of the ExEx.
     fn new(
         ctx: ExExContext<Node>,
@@ -216,7 +217,13 @@ impl<Node: FullNodeComponents> BackfillExEx<Node> {
 /// [`process_committed_chain`] method for each block.
 async fn backfill_with_job<
     E: BlockExecutorProvider + Send,
-    P: BlockReader + HeaderProvider + StateProviderFactory + Clone + Send + Unpin + 'static,
+    P: BlockReader<Block = Block>
+        + HeaderProvider
+        + StateProviderFactory
+        + Clone
+        + Send
+        + Unpin
+        + 'static,
 >(
     job: BackfillJob<E, P>,
 ) -> eyre::Result<()> {

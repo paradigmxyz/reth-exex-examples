@@ -40,25 +40,25 @@ reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth" }
 reth-tracing = { git = "https://github.com/paradigmxyz/reth" }
 
 # alloy
-alloy-eips = { version = "0.5.4", default-features = false }
-alloy-consensus = { version = "0.5.4", default-features = false }
+alloy-eips = { version = "0.6.4", default-features = false }
+alloy-consensus = { version = "0.6.4", default-features = false }
 alloy-primitives = { version = "0.8.9", default-features = false }
 alloy-rlp = "0.3.4"
-alloy-rpc-types = { version = "0.5.4", features = [
+alloy-rpc-types = { version = "0.6.4", features = [
     "eth",
 ], default-features = false }
-alloy-signer = { version = "0.5.4", default-features = false }
-alloy-signer-local = { version = "0.5.4", default-features = false }
+alloy-signer = { version = "0.6.4", default-features = false }
+alloy-signer-local = { version = "0.6.4", default-features = false }
 alloy-sol-types  = { version = "0.8", features = ["json"] }
 
-discv5 = "0.8"
+discv5 = "0.9"
 
 # async
 futures = "0.3"
 futures-util = "0.3"
 tokio = { version = "1.0", features = ["full"] }
 tokio-stream = "0.1"
-tokio-tungstenite = { version = "0.23", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
 
 # serde
 serde = "1"
