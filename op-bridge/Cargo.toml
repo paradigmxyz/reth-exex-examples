@@ -23,7 +23,7 @@ alloy-eips.workspace = true
 # misc
 eyre.workspace = true
 futures.workspace = true
-rusqlite = { version = "0.31.0", features = ["bundled"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
 tokio.workspace = true
 
 [dev-dependencies]
