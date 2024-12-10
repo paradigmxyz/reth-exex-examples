@@ -3,6 +3,7 @@ use super::{
 };
 use alloy_primitives::{Address, B256};
 use alloy_rlp::{BytesMut, Encodable};
+use alloy_signer::Signature;
 use futures::{Stream, StreamExt};
 use reth_eth_wire::{
     capability::SharedCapabilities, multiplex::ProtocolConnection, protocol::Protocol,
@@ -85,7 +86,7 @@ impl Stream for OracleConnection {
                 }
                 OracleProtoMessageKind::SignedTicker(signed_data) => {
                     let signer = signed_data.signer;
-                    let sig = signed_data.signature;
+                    let sig = Signature::try_from(signed_data.signature.as_ref()).unwrap();
 
                     let mut buffer = BytesMut::new();
                     signed_data.ticker.encode(&mut buffer);

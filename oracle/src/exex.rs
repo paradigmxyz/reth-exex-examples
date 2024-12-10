@@ -1,8 +1,10 @@
+use alloy_consensus::BlockHeader;
 use eyre::Result;
 use futures::{Future, FutureExt, TryStreamExt};
-use reth::providers::ExecutionOutcome;
+use reth::{api::NodeTypes, providers::ExecutionOutcome};
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
+use reth_primitives::EthPrimitives;
 use reth_tracing::tracing::info;
 use std::{
     pin::Pin,
@@ -22,7 +24,10 @@ impl<Node: FullNodeComponents> ExEx<Node> {
     }
 }
 
-impl<Node: FullNodeComponents> Future for ExEx<Node> {
+impl<Node> Future for ExEx<Node>
+where
+    Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>,
+{
     type Output = Result<()>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -35,11 +40,11 @@ impl<Node: FullNodeComponents> Future for ExEx<Node> {
                 }
                 ExExNotification::ChainReorged { old, new } => {
                     // revert to block before the reorg
-                    this.execution_outcome.revert_to(new.first().number - 1);
+                    this.execution_outcome.revert_to(new.first().number() - 1);
                     info!(from_chain = ?old.range(), to_chain = ?new.range(), "Received reorg");
                 }
                 ExExNotification::ChainReverted { old } => {
-                    this.execution_outcome.revert_to(old.first().number - 1);
+                    this.execution_outcome.revert_to(old.first().number() - 1);
                     info!(reverted_chain = ?old.range(), "Received revert");
                 }
             };

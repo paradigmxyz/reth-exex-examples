@@ -19,10 +19,10 @@ reth-node-ethereum.workspace = true
 reth-primitives.workspace = true
 reth-tracing.workspace = true
 reth.workspace = true
-reth-tokio-util = { git = "https://github.com/paradigmxyz/reth" }
 
 # alloy
-alloy-primitives.workspace = true
+alloy-primitives = { workspace = true, features = ["rlp"] }
+alloy-consensus.workspace = true
 alloy-rlp.workspace = true
 alloy-rpc-types.workspace = true
 alloy-signer-local.workspace = true
@@ -30,7 +30,7 @@ alloy-signer.workspace = true
 
 # networking
 discv5.workspace = true
-enr = "0.12"
+enr.workspace = true
 
 # async
 futures.workspace = true

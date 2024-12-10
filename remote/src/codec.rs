@@ -47,7 +47,8 @@ impl TryFrom<&reth::providers::Chain> for proto::Chain {
                         }),
                         body: block
                             .body
-                            .transactions()
+                            .transactions
+                            .iter()
                             .map(TryInto::try_into)
                             .collect::<eyre::Result<_>>()?,
                         ommers: block.body.ommers.iter().map(Into::into).collect(),
@@ -141,7 +142,7 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
         let signature = proto::Signature {
             r: transaction.signature.r().to_le_bytes_vec(),
             s: transaction.signature.s().to_le_bytes_vec(),
-            y_parity: transaction.signature.v().y_parity(),
+            y_parity: transaction.signature.v(),
         };
         let transaction = match &transaction.transaction {
             reth::primitives::Transaction::Legacy(alloy_consensus::TxLegacy {
@@ -257,7 +258,7 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
                             signature: Some(proto::Signature {
                                 r: signature.r().to_le_bytes_vec(),
                                 s: signature.s().to_le_bytes_vec(),
-                                y_parity: signature.v().y_parity(),
+                                y_parity: signature.v(),
                             }),
                         })
                     })
@@ -645,6 +646,7 @@ impl TryFrom<&proto::Header> for reth::primitives::Header {
                 .transpose()?,
             requests_hash: None,
             extra_data: header.extra_data.as_slice().to_vec().into(),
+            target_blobs_per_block: None,
         })
     }
 }
@@ -655,11 +657,11 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
     fn try_from(transaction: &proto::Transaction) -> Result<Self, Self::Error> {
         let hash = TxHash::try_from(transaction.hash.as_slice())?;
         let signature = transaction.signature.as_ref().ok_or_eyre("no signature")?;
-        let signature = alloy_primitives::Signature::from_rs_and_parity(
+        let signature = alloy_primitives::PrimitiveSignature::new(
             U256::try_from_le_slice(signature.r.as_slice()).ok_or_eyre("failed to parse r")?,
             U256::try_from_le_slice(signature.s.as_slice()).ok_or_eyre("failed to parse s")?,
             signature.y_parity,
-        )?;
+        );
 
         let transaction = match transaction.transaction.as_ref().ok_or_eyre("no transaction")? {
             proto::transaction::Transaction::Legacy(proto::TransactionLegacy {
@@ -801,13 +803,13 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
                     .map(|authorization| {
                         let signature =
                             authorization.signature.as_ref().ok_or_eyre("no signature")?;
-                        let signature = alloy_primitives::Signature::from_rs_and_parity(
+                        let signature = alloy_primitives::PrimitiveSignature::new(
                             U256::try_from_le_slice(signature.r.as_slice())
                                 .ok_or_eyre("failed to parse r")?,
                             U256::try_from_le_slice(signature.s.as_slice())
                                 .ok_or_eyre("failed to parse s")?,
                             signature.y_parity,
-                        )?;
+                        );
 
                         let authorization =
                             authorization.authorization.as_ref().ok_or_eyre("no authorization")?;
@@ -832,7 +834,7 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
             }),
         };
 
-        Ok(reth::primitives::TransactionSigned { hash, signature, transaction })
+        Ok(reth::primitives::TransactionSigned::new(transaction, signature, hash))
     }
 }
 

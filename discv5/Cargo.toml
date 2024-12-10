@@ -19,7 +19,7 @@ reth.workspace = true
 
 # networking
 discv5.workspace = true
-enr = "0.12"
+enr.workspace = true
 
 # async
 futures-util.workspace = true
