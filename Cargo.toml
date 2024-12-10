@@ -41,6 +41,7 @@ reth-tracing = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
 
 # alloy
 alloy-eips = { version = "0.7", default-features = false }
+alloy-genesis = { version = "0.7", default-features = false }
 alloy-consensus = { version = "0.7", default-features = false }
 alloy-rlp = "0.3.4"
 alloy-rpc-types = { version = "0.7", features = [
@@ -54,6 +55,10 @@ alloy-sol-types  = { version = "0.8", features = ["json"] }
 
 discv5 = "0.8"
 enr = "0.12.1"
+secp256k1 = { version = "0.29", default-features = false, features = [
+ "global-context",
+ "recovery",
+] }
 
 # async
 futures = "0.3"

@@ -2,6 +2,7 @@ use remote::proto::{
     remote_ex_ex_server::{RemoteExEx, RemoteExExServer},
     ExExNotification as ProtoExExNotification, SubscribeRequest as ProtoSubscribeRequest,
 };
+use reth::{api::NodeTypes, primitives::EthPrimitives};
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
@@ -37,10 +38,13 @@ impl RemoteExEx for ExExService {
     }
 }
 
-async fn exex<Node: FullNodeComponents>(
+async fn exex<Node>(
     mut ctx: ExExContext<Node>,
     notifications: broadcast::Sender<ExExNotification>,
-) -> eyre::Result<()> {
+) -> eyre::Result<()>
+where
+    Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>,
+{
     while let Some(notification) = ctx.notifications.try_next().await? {
         if let Some(committed_chain) = notification.committed_chain() {
             ctx.events.send(ExExEvent::FinishedHeight(committed_chain.tip().num_hash()))?;

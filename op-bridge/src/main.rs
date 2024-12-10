@@ -1,13 +1,12 @@
 use alloy_primitives::{address, Address};
 use alloy_sol_types::{sol, SolEventInterface};
 use futures::{Future, FutureExt, TryStreamExt};
-use reth::providers::{BlockReader, HeaderProvider, StateProviderFactory};
-use reth_evm::execute::BlockExecutorProvider;
+use reth::api::NodeTypes;
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
-use reth_primitives::{Block, EthPrimitives, Log, SealedBlockWithSenders, TransactionSigned};
+use reth_primitives::{EthPrimitives, Log, SealedBlockWithSenders, TransactionSigned};
 use reth_tracing::tracing::info;
 use rusqlite::Connection;
 
@@ -31,15 +30,7 @@ async fn init<Node>(
     mut connection: Connection,
 ) -> eyre::Result<impl Future<Output = eyre::Result<()>>>
 where
-    Node: FullNodeComponents<
-        Provider: BlockReader<Block = Block>
-                      + HeaderProvider
-                      + StateProviderFactory
-                      + Clone
-                      + Unpin
-                      + 'static,
-        Executor: BlockExecutorProvider<Primitives = EthPrimitives> + Clone + Unpin + 'static,
-    >,
+    Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>,
 {
     create_tables(&mut connection)?;
 
@@ -116,15 +107,7 @@ async fn op_bridge_exex<Node>(
     connection: Connection,
 ) -> eyre::Result<()>
 where
-    Node: FullNodeComponents<
-        Provider: BlockReader<Block = Block>
-                      + HeaderProvider
-                      + StateProviderFactory
-                      + Clone
-                      + Unpin
-                      + 'static,
-        Executor: BlockExecutorProvider<Primitives = EthPrimitives> + Clone + Unpin + 'static,
-    >,
+    Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>,
 {
     // Process all new chain state notifications
     while let Some(notification) = ctx.notifications.try_next().await? {

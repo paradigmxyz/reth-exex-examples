@@ -1,11 +1,10 @@
 use alloy_consensus::BlockHeader;
 use eyre::Result;
 use futures::{Future, FutureExt, TryStreamExt};
-use reth::providers::{BlockReader, ExecutionOutcome, HeaderProvider, StateProviderFactory};
-use reth_evm::execute::BlockExecutorProvider;
+use reth::{api::NodeTypes, providers::ExecutionOutcome};
 use reth_exex::{ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
-use reth_primitives::{Block, EthPrimitives};
+use reth_primitives::EthPrimitives;
 use reth_tracing::tracing::info;
 use std::{
     pin::Pin,
@@ -27,15 +26,7 @@ impl<Node: FullNodeComponents> ExEx<Node> {
 
 impl<Node> Future for ExEx<Node>
 where
-    Node: FullNodeComponents<
-        Provider: BlockReader<Block = Block>
-                      + HeaderProvider
-                      + StateProviderFactory
-                      + Clone
-                      + Unpin
-                      + 'static,
-        Executor: BlockExecutorProvider<Primitives = EthPrimitives> + Clone + Unpin + 'static,
-    >,
+    Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>,
 {
     type Output = Result<()>;
 

@@ -88,11 +88,10 @@ mod tests {
     use reth_exex_test_utils::test_exex_context;
     use reth_network::{NetworkEvent, NetworkEventListenerProvider, NetworkInfo, Peers};
     use reth_network_api::PeerId;
-    use reth_tokio_util::EventStream;
     use reth_tracing::tracing::info;
     use tokio_stream::wrappers::BroadcastStream;
 
-    async fn wait_for_session(mut events: EventStream<NetworkEvent>) -> PeerId {
+    async fn wait_for_session(mut events: impl Stream<Item = NetworkEvent> + Unpin) -> PeerId {
         while let Some(event) = events.next().await {
             if let NetworkEvent::ActivePeerSession { info, .. } = event {
                 info!("Session established with {}", info.peer_id);

@@ -7,12 +7,12 @@ use eyre::OptionExt;
 use futures::{FutureExt, Stream, StreamExt, TryStreamExt};
 use jsonrpsee::tracing::instrument;
 use reth::{
+    api::NodeTypes,
     chainspec::EthereumChainSpecParser,
-    primitives::{Block, EthPrimitives},
-    providers::{BlockIdReader, BlockReader, HeaderProvider, StateProviderFactory},
+    primitives::EthPrimitives,
+    providers::BlockIdReader,
     rpc::types::{BlockId, BlockNumberOrTag},
 };
-use reth_evm::execute::BlockExecutorProvider;
 use reth_execution_types::Chain;
 use reth_exex::{BackfillJob, BackfillJobFactory, ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
@@ -56,15 +56,7 @@ struct BackfillExEx<Node: FullNodeComponents> {
 
 impl<Node> BackfillExEx<Node>
 where
-    Node: FullNodeComponents<
-        Provider: BlockReader<Block = Block>
-                      + HeaderProvider
-                      + StateProviderFactory
-                      + Clone
-                      + Unpin
-                      + 'static,
-        Executor: BlockExecutorProvider<Primitives = EthPrimitives> + Clone + Unpin + 'static,
-    >,
+    Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>,
 {
     /// Creates a new instance of the ExEx.
     fn new(

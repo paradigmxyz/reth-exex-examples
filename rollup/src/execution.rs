@@ -6,7 +6,7 @@ use alloy_eips::{
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_rlp::Decodable as _;
 use eyre::OptionExt;
-use reth::transaction_pool::TransactionPool;
+use reth::{core::primitives::SignedTransaction, transaction_pool::TransactionPool};
 use reth_execution_errors::BlockValidationError;
 use reth_node_api::{ConfigureEvm, ConfigureEvmEnv};
 use reth_node_ethereum::EthEvmConfig;
@@ -262,8 +262,9 @@ fn execute_transactions(
 
 #[cfg(test)]
 mod tests {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
+    use crate::{
+        db::Database, execute_block, Zenith::BlockHeader, CHAIN_ID, ROLLUP_SUBMITTER_ADDRESS,
+    };
     use alloy_consensus::{constants::ETH_TO_WEI, SidecarBuilder, SimpleCoder, TxEip2930};
     use alloy_eips::eip2718::Encodable2718;
     use alloy_primitives::{bytes, keccak256, BlockNumber, TxKind, U256};
@@ -280,10 +281,7 @@ mod tests {
     };
     use rusqlite::Connection;
     use secp256k1::{Keypair, Secp256k1};
-
-    use crate::{
-        db::Database, execute_block, Zenith::BlockHeader, CHAIN_ID, ROLLUP_SUBMITTER_ADDRESS,
-    };
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     sol!(
         WETH,

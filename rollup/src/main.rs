@@ -12,13 +12,13 @@ use db::Database;
 use execution::execute_block;
 use futures_util::TryStreamExt;
 use once_cell::sync::Lazy;
+use reth::api::NodeTypes;
 use reth_chainspec::{ChainSpec, ChainSpecBuilder};
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
-use reth_primitives::{Block, SealedBlockWithSenders, TransactionSigned};
-use reth_provider::BlockReader;
+use reth_primitives::{EthPrimitives, SealedBlockWithSenders, TransactionSigned};
 use reth_tracing::tracing::{error, info};
 use rusqlite::Connection;
 use std::sync::Arc;
@@ -48,7 +48,10 @@ struct Rollup<Node: FullNodeComponents> {
     db: Database,
 }
 
-impl<Node: FullNodeComponents<Provider: BlockReader<Block = Block>>> Rollup<Node> {
+impl<Node> Rollup<Node>
+where
+    Node: FullNodeComponents<Types: NodeTypes<Primitives = EthPrimitives>>,
+{
     fn new(ctx: ExExContext<Node>, connection: Connection) -> eyre::Result<Self> {
         let db = Database::new(connection)?;
         Ok(Self { ctx, db })
