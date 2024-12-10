@@ -1,12 +1,13 @@
 use alloy_primitives::{address, Address};
 use alloy_sol_types::{sol, SolEventInterface};
 use futures::{Future, FutureExt, TryStreamExt};
-use reth::providers::BlockReader;
+use reth::providers::{BlockReader, HeaderProvider, StateProviderFactory};
+use reth_evm::execute::BlockExecutorProvider;
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
-use reth_primitives::{Block, Log, SealedBlockWithSenders, TransactionSigned};
+use reth_primitives::{Block, EthPrimitives, Log, SealedBlockWithSenders, TransactionSigned};
 use reth_tracing::tracing::info;
 use rusqlite::Connection;
 
@@ -25,10 +26,21 @@ const OP_BRIDGES: [Address; 6] = [
 /// Initializes the ExEx.
 ///
 /// Opens up a SQLite database and creates the tables (if they don't exist).
-async fn init<Node: FullNodeComponents<Provider: BlockReader<Block = Block>>>(
+async fn init<Node>(
     ctx: ExExContext<Node>,
     mut connection: Connection,
-) -> eyre::Result<impl Future<Output = eyre::Result<()>>> {
+) -> eyre::Result<impl Future<Output = eyre::Result<()>>>
+where
+    Node: FullNodeComponents<
+        Provider: BlockReader<Block = Block>
+                      + HeaderProvider
+                      + StateProviderFactory
+                      + Clone
+                      + Unpin
+                      + 'static,
+        Executor: BlockExecutorProvider<Primitives = EthPrimitives> + Clone + Unpin + 'static,
+    >,
+{
     create_tables(&mut connection)?;
 
     Ok(op_bridge_exex(ctx, connection))
@@ -99,10 +111,21 @@ fn create_tables(connection: &mut Connection) -> rusqlite::Result<()> {
 
 /// An example of ExEx that listens to ETH bridging events from OP Stack chains
 /// and stores deposits and withdrawals in a SQLite database.
-async fn op_bridge_exex<Node: FullNodeComponents<Provider: BlockReader<Block = Block>>>(
+async fn op_bridge_exex<Node>(
     mut ctx: ExExContext<Node>,
     connection: Connection,
-) -> eyre::Result<()> {
+) -> eyre::Result<()>
+where
+    Node: FullNodeComponents<
+        Provider: BlockReader<Block = Block>
+                      + HeaderProvider
+                      + StateProviderFactory
+                      + Clone
+                      + Unpin
+                      + 'static,
+        Executor: BlockExecutorProvider<Primitives = EthPrimitives> + Clone + Unpin + 'static,
+    >,
+{
     // Process all new chain state notifications
     while let Some(notification) = ctx.notifications.try_next().await? {
         // Revert all deposits and withdrawals
@@ -272,8 +295,7 @@ fn main() -> eyre::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::pin::pin;
-
+    use super::*;
     use alloy_consensus::TxLegacy;
     use alloy_eips::eip7685::Requests;
     use alloy_primitives::{Address, TxKind, U256};
@@ -286,8 +308,7 @@ mod tests {
     };
     use reth_testing_utils::generators::sign_tx_with_random_key_pair;
     use rusqlite::Connection;
-
-    use crate::{L1StandardBridge, OP_BRIDGES};
+    use std::pin::pin;
 
     /// Given the address of a bridge contract and an event, construct a transaction signed with a
     /// random private key and a receipt for that transaction.

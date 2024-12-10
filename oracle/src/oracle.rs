@@ -7,7 +7,10 @@ use alloy_rlp::{BytesMut, Encodable};
 use alloy_signer::SignerSync;
 use alloy_signer_local::PrivateKeySigner;
 use futures::{FutureExt, Stream, StreamExt};
+use reth::providers::{BlockReader, HeaderProvider, StateProviderFactory};
+use reth_evm::execute::BlockExecutorProvider;
 use reth_node_api::FullNodeComponents;
+use reth_primitives::{Block, EthPrimitives};
 use reth_tracing::tracing::{error, info, trace};
 use std::{
     future::Future,
@@ -60,8 +63,17 @@ where
     }
 }
 
-impl<Node: FullNodeComponents, D> Future for Oracle<Node, D>
+impl<Node, D> Future for Oracle<Node, D>
 where
+    Node: FullNodeComponents<
+        Provider: BlockReader<Block = Block>
+                      + HeaderProvider
+                      + StateProviderFactory
+                      + Clone
+                      + Unpin
+                      + 'static,
+        Executor: BlockExecutorProvider<Primitives = EthPrimitives> + Clone + Unpin + 'static,
+    >,
     D: Stream<Item = Result<DataFeeds, DataFeederError>> + Send + 'static + std::marker::Unpin,
 {
     type Output = eyre::Result<()>;

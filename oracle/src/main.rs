@@ -94,9 +94,9 @@ mod tests {
 
     async fn wait_for_session(mut events: EventStream<NetworkEvent>) -> PeerId {
         while let Some(event) = events.next().await {
-            if let NetworkEvent::SessionEstablished { peer_id, .. } = event {
-                info!("Session established with {}", peer_id);
-                return peer_id;
+            if let NetworkEvent::ActivePeerSession { info, .. } = event {
+                info!("Session established with {}", info.peer_id);
+                return info.peer_id;
             }
             info!("Unexpected event: {:?}", event);
         }

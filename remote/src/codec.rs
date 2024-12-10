@@ -646,6 +646,7 @@ impl TryFrom<&proto::Header> for reth::primitives::Header {
                 .transpose()?,
             requests_hash: None,
             extra_data: header.extra_data.as_slice().to_vec().into(),
+            target_blobs_per_block: None,
         })
     }
 }

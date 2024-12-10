@@ -1,15 +1,14 @@
 mod rpc;
 
-use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
-
+use crate::rpc::{BackfillRpcExt, BackfillRpcExtApiServer};
 use alloy_primitives::BlockNumber;
 use clap::{Args, Parser};
 use eyre::OptionExt;
-use futures::{FutureExt, StreamExt, TryStreamExt};
+use futures::{FutureExt, Stream, StreamExt, TryStreamExt};
 use jsonrpsee::tracing::instrument;
 use reth::{
     chainspec::EthereumChainSpecParser,
-    primitives::Block,
+    primitives::{Block, EthPrimitives},
     providers::{BlockIdReader, BlockReader, HeaderProvider, StateProviderFactory},
     rpc::types::{BlockId, BlockNumberOrTag},
 };
@@ -19,9 +18,8 @@ use reth_exex::{BackfillJob, BackfillJobFactory, ExExContext, ExExEvent, ExExNot
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
 use reth_tracing::tracing::{error, info};
+use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
 use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
-
-use crate::rpc::{BackfillRpcExt, BackfillRpcExtApiServer};
 
 /// The message type used to communicate with the ExEx.
 enum BackfillMessage {
@@ -56,7 +54,18 @@ struct BackfillExEx<Node: FullNodeComponents> {
     backfill_jobs: HashMap<u64, oneshot::Sender<oneshot::Sender<()>>>,
 }
 
-impl<Node: FullNodeComponents<Provider: BlockReader<Block = Block>>> BackfillExEx<Node> {
+impl<Node> BackfillExEx<Node>
+where
+    Node: FullNodeComponents<
+        Provider: BlockReader<Block = Block>
+                      + HeaderProvider
+                      + StateProviderFactory
+                      + Clone
+                      + Unpin
+                      + 'static,
+        Executor: BlockExecutorProvider<Primitives = EthPrimitives> + Clone + Unpin + 'static,
+    >,
+{
     /// Creates a new instance of the ExEx.
     fn new(
         ctx: ExExContext<Node>,
@@ -192,7 +201,7 @@ impl<Node: FullNodeComponents<Provider: BlockReader<Block = Block>>> BackfillExE
         backfill_tx: mpsc::UnboundedSender<BackfillMessage>,
         cancel_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
-        let backfill = backfill_with_job(job);
+        let backfill = backfill_with_job(job.into_stream());
 
         tokio::select! {
             result = backfill => {
@@ -215,21 +224,12 @@ impl<Node: FullNodeComponents<Provider: BlockReader<Block = Block>>> BackfillExE
 
 /// Backfills the given range of blocks in parallel, calling the
 /// [`process_committed_chain`] method for each block.
-async fn backfill_with_job<
-    E: BlockExecutorProvider + Send,
-    P: BlockReader<Block = Block>
-        + HeaderProvider
-        + StateProviderFactory
-        + Clone
-        + Send
-        + Unpin
-        + 'static,
->(
-    job: BackfillJob<E, P>,
-) -> eyre::Result<()> {
-    job
-        // Convert the backfill job into a parallel stream
-        .into_stream()
+async fn backfill_with_job<S, E>(st: S) -> eyre::Result<()>
+where
+    S: Stream<Item = Result<Chain, E>>,
+    E: Into<eyre::Error>,
+{
+    st
         // Covert the block execution error into `eyre`
         .map_err(Into::into)
         // Process each block, returning early if an error occurs
@@ -311,7 +311,7 @@ fn main() -> eyre::Result<()> {
                                     .backfill_job_factory
                                     .backfill(args.from_block.unwrap_or(1)..=to_block);
 
-                                backfill_with_job(job).await.map_err(|err| {
+                                backfill_with_job(job.into_stream()).await.map_err(|err| {
                                     eyre::eyre!("failed to backfill for the provided args: {err:?}")
                                 })?;
                             }
