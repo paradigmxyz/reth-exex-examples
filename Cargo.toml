@@ -20,35 +20,35 @@ publish = false
 
 [workspace.dependencies]
 # reth
-reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-discv5 = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-execution-errors = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-execution-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-exex = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3", features = ["serde"] }
-reth-eth-wire = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-evm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-network = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3", features = ["test-utils"] }
-reth-network-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-network-peers = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-node-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-primitives = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-provider = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-revm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-tracing = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
+reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-discv5 = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-execution-errors = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-execution-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-exex = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5", features = ["serde"] }
+reth-eth-wire = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-evm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-network = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5", features = ["test-utils"] }
+reth-network-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-network-peers = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-node-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-provider = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-tracing = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
 
 # alloy
-alloy-eips = { version = "0.7", default-features = false }
-alloy-genesis = { version = "0.7", default-features = false }
-alloy-consensus = { version = "0.7", default-features = false }
+alloy-eips = { version = "0.9", default-features = false }
+alloy-genesis = { version = "0.9", default-features = false }
+alloy-consensus = { version = "0.9", default-features = false }
 alloy-rlp = "0.3.4"
-alloy-rpc-types = { version = "0.7", features = [
+alloy-rpc-types = { version = "0.9", features = [
     "eth",
 ], default-features = false }
-alloy-signer = { version = "0.7", default-features = false }
-alloy-signer-local = { version = "0.7", default-features = false }
+alloy-signer = { version = "0.9", default-features = false }
+alloy-signer-local = { version = "0.9", default-features = false }
 
 alloy-primitives = { version = "0.8", default-features = false }
 alloy-sol-types  = { version = "0.8", features = ["json"] }
@@ -75,5 +75,5 @@ serde_json = "1"
 eyre = "0.6"
 
 # testing
-reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
-reth-testing-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.3" }
+reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }
+reth-testing-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.5" }

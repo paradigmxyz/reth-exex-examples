@@ -116,7 +116,7 @@ where
                                     tx_hash = %tx.recalculate_hash(),
                                     chain_id = %header.rollupChainId,
                                     sequence = %header.sequence,
-                                    transactions = block.body.transactions.len(),
+                                    transactions = block.body().transactions.len(),
                                     "Block submitted, executed and inserted into database"
                                 );
                             }
@@ -246,7 +246,7 @@ fn decode_chain_into_rollup_events(
         // Get all receipts
         .flat_map(|(block, receipts)| {
             block
-                .body
+                .body()
                 .transactions
                 .iter()
                 .zip(receipts.iter().flatten())
