@@ -234,7 +234,7 @@ fn process_committed_chain(chain: &Chain) -> eyre::Result<()> {
     // Calculate the number of blocks and transactions in the committed chain
     let blocks = chain.blocks().len();
     let transactions =
-        chain.blocks().values().map(|block| block.body.transactions.len()).sum::<usize>();
+        chain.blocks().values().map(|block| block.transactions().len()).sum::<usize>();
 
     info!(first_block = %chain.execution_outcome().first_block, %blocks, %transactions, "Processed committed blocks");
     Ok(())

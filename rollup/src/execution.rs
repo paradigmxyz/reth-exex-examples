@@ -109,7 +109,7 @@ fn configure_evm<'a>(
     );
 
     let mut cfg = CfgEnvWithHandlerCfg::new_with_spec_id(evm.cfg().clone(), evm.spec_id());
-    config.fill_cfg_and_block_env(&mut cfg, evm.block_mut(), header, U256::ZERO);
+    config.fill_cfg_and_block_env(&mut cfg, evm.block_mut(), header);
     *evm.cfg_mut() = cfg.cfg_env;
 
     evm

@@ -46,12 +46,12 @@ impl TryFrom<&reth::providers::Chain> for proto::Chain {
                             header: Some(block.header.header().into()),
                         }),
                         body: block
-                            .body
+                            .body()
                             .transactions
                             .iter()
                             .map(TryInto::try_into)
                             .collect::<eyre::Result<_>>()?,
-                        ommers: block.body.ommers.iter().map(Into::into).collect(),
+                        ommers: block.body().ommers.iter().map(Into::into).collect(),
                         senders: block.senders.iter().map(|sender| sender.to_vec()).collect(),
                     })
                 })
@@ -251,7 +251,7 @@ impl TryFrom<&reth::primitives::TransactionSigned> for proto::Transaction {
 
                         Ok(proto::AuthorizationListItem {
                             authorization: Some(proto::Authorization {
-                                chain_id: authorization.chain_id().to_le_bytes().to_vec(),
+                                chain_id: authorization.chain_id().to_le_bytes_vec(),
                                 address: authorization.address().to_vec(),
                                 nonce: authorization.nonce(),
                             }),
@@ -646,7 +646,6 @@ impl TryFrom<&proto::Header> for reth::primitives::Header {
                 .transpose()?,
             requests_hash: None,
             extra_data: header.extra_data.as_slice().to_vec().into(),
-            target_blobs_per_block: None,
         })
     }
 }
@@ -814,7 +813,7 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
                         let authorization =
                             authorization.authorization.as_ref().ok_or_eyre("no authorization")?;
 
-                        let chain_id: u64 = u64::from_le_bytes(
+                        let chain_id = U256::from_le_bytes::<{ U256::BYTES }>(
                             authorization
                                 .chain_id
                                 .as_slice()

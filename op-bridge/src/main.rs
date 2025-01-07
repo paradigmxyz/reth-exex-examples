@@ -225,7 +225,7 @@ fn decode_chain_into_events(
         // Get all receipts
         .flat_map(|(block, receipts)| {
             block
-                .body
+                .body()
                 .transactions
                 .iter()
                 .zip(receipts.iter().flatten())
@@ -395,7 +395,7 @@ mod tests {
                 from_address.to_string(),
                 to_address.to_string(),
                 deposit_event.amount.to_string(),
-                block.body.transactions[0].hash().to_string()
+                block.body().transactions[0].hash().to_string()
             )
         );
 
@@ -415,7 +415,7 @@ mod tests {
                 from_address.to_string(),
                 to_address.to_string(),
                 withdrawal_event.amount.to_string(),
-                block.body.transactions[1].hash().to_string()
+                block.body().transactions[1].hash().to_string()
             )
         );
 
