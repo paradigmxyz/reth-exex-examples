@@ -8,14 +8,13 @@ publish.workspace = true
 
 [dependencies]
 # reth
-reth-chainspec.workspace = true
 reth-discv5.workspace = true
 reth-exex.workspace = true
 reth-network-peers.workspace = true
 reth-node-api.workspace = true
 reth-node-ethereum.workspace = true
 reth-tracing.workspace = true
-reth-ethereum.workspace = true
+reth.workspace = true
 
 # networking
 discv5.workspace = true
@@ -30,7 +29,3 @@ tokio.workspace = true
 # misc
 clap = "4" 
 eyre.workspace = true
-
-[dev-dependencies]
-reth-exex-test-utils.workspace = true
-reth-testing-utils.workspace = true
