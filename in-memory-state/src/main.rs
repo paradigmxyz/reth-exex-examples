@@ -82,7 +82,7 @@ fn main() -> eyre::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reth::{primitives::SealedBlockWithSenders, revm::db::BundleState};
+    use reth::revm::db::BundleState;
     use reth_execution_types::{Chain, ExecutionOutcome};
     use reth_exex_test_utils::{test_exex_context, PollOnce};
     use reth_testing_utils::generators::{self, random_block, random_receipt, BlockParams};
@@ -98,14 +98,14 @@ mod tests {
         let mut expected_state = ExecutionOutcome::default();
 
         // Generate first block and its state
-        let block_1: SealedBlockWithSenders =
+        let block_1 =
             random_block(&mut rng, 0, BlockParams { tx_count: Some(1), ..Default::default() })
-                .seal_with_senders()
-                .ok_or(eyre::eyre!("failed to recover senders"))?;
+                .try_recover()
+                .unwrap();
         let block_number_1 = block_1.header().number();
         let execution_outcome1 = ExecutionOutcome::new(
             BundleState::default(),
-            vec![random_receipt(&mut rng, &block_1.body().transactions[0], None)].into(),
+            vec![vec![random_receipt(&mut rng, &block_1.body().transactions[0], None)]],
             block_1.header().number(),
             vec![],
         );
@@ -123,13 +123,13 @@ mod tests {
         assert_eq!(exex.as_mut().execution_outcome, expected_state);
 
         // Generate second block and its state
-        let block_2: SealedBlockWithSenders =
+        let block_2 =
             random_block(&mut rng, 1, BlockParams { tx_count: Some(2), ..Default::default() })
-                .seal_with_senders()
-                .ok_or(eyre::eyre!("failed to recover senders"))?;
+                .try_recover()
+                .unwrap();
         let execution_outcome2 = ExecutionOutcome::new(
             BundleState::default(),
-            vec![random_receipt(&mut rng, &block_2.body().transactions[0], None)].into(),
+            vec![vec![random_receipt(&mut rng, &block_2.body().transactions[0], None)]],
             block_2.header().number(),
             vec![],
         );

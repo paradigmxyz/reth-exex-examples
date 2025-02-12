@@ -12,13 +12,13 @@ use db::Database;
 use execution::execute_block;
 use futures_util::TryStreamExt;
 use once_cell::sync::Lazy;
-use reth::api::NodeTypes;
+use reth::api::{BlockBody, NodeTypes};
 use reth_chainspec::{ChainSpec, ChainSpecBuilder};
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
-use reth_primitives::{EthPrimitives, SealedBlockWithSenders, TransactionSigned};
+use reth_primitives::{Block, EthPrimitives, RecoveredBlock, TransactionSigned};
 use reth_tracing::tracing::{error, info};
 use rusqlite::Connection;
 use std::sync::Arc;
@@ -110,10 +110,9 @@ where
                         .await
                         {
                             Ok((block, bundle, _, _)) => {
-                                let block = block.seal_slow();
                                 self.db.insert_block_with_bundle(&block, bundle)?;
                                 info!(
-                                    tx_hash = %tx.recalculate_hash(),
+                                    tx_hash = %tx.hash(),
                                     chain_id = %header.rollupChainId,
                                     sequence = %header.sequence,
                                     transactions = block.body().transactions.len(),
@@ -123,7 +122,7 @@ where
                             Err(err) => {
                                 error!(
                                     %err,
-                                    tx_hash = %tx.recalculate_hash(),
+                                    tx_hash = %tx.hash(),
                                     chain_id = %header.rollupChainId,
                                     sequence = %header.sequence,
                                     "Failed to execute block"
@@ -141,11 +140,11 @@ where
                     amount,
                 }) => {
                     if rollupChainId != U256::from(CHAIN_ID) {
-                        error!(tx_hash = %tx.recalculate_hash(), "Invalid rollup chain ID");
+                        error!(tx_hash = %tx.hash(), "Invalid rollup chain ID");
                         continue;
                     }
                     if token != Address::ZERO {
-                        error!(tx_hash = %tx.recalculate_hash(), "Only ETH deposits are supported");
+                        error!(tx_hash = %tx.hash(), "Only ETH deposits are supported");
                         continue;
                     }
 
@@ -156,7 +155,7 @@ where
                     })?;
 
                     info!(
-                        tx_hash = %tx.recalculate_hash(),
+                        tx_hash = %tx.hash(),
                         %amount,
                         recipient = %rollupRecipient,
                         "Deposit",
@@ -191,7 +190,7 @@ where
                     {
                         self.db.revert_tip_block(header.sequence)?;
                         info!(
-                            tx_hash = %tx.recalculate_hash(),
+                            tx_hash = %tx.hash(),
                             chain_id = %header.rollupChainId,
                             sequence = %header.sequence,
                             "Block reverted"
@@ -206,11 +205,11 @@ where
                     amount,
                 }) => {
                     if rollupChainId != U256::from(CHAIN_ID) {
-                        error!(tx_hash = %tx.recalculate_hash(), "Invalid rollup chain ID");
+                        error!(tx_hash = %tx.hash(), "Invalid rollup chain ID");
                         continue;
                     }
                     if token != Address::ZERO {
-                        error!(tx_hash = %tx.recalculate_hash(), "Only ETH deposits are supported");
+                        error!(tx_hash = %tx.hash(), "Only ETH deposits are supported");
                         continue;
                     }
 
@@ -221,7 +220,7 @@ where
                     })?;
 
                     info!(
-                        tx_hash = %tx.recalculate_hash(),
+                        tx_hash = %tx.hash(),
                         %amount,
                         recipient = %rollupRecipient,
                         "Deposit reverted",
@@ -239,7 +238,7 @@ where
 /// Rollup contract [ROLLUP_CONTRACT_ADDRESS] and extract [RollupContractEvents].
 fn decode_chain_into_rollup_events(
     chain: &Chain,
-) -> Vec<(&SealedBlockWithSenders, &TransactionSigned, RollupContractEvents)> {
+) -> Vec<(&RecoveredBlock<Block>, &TransactionSigned, RollupContractEvents)> {
     chain
         // Get all blocks and receipts
         .blocks_and_receipts()
@@ -247,9 +246,8 @@ fn decode_chain_into_rollup_events(
         .flat_map(|(block, receipts)| {
             block
                 .body()
-                .transactions
-                .iter()
-                .zip(receipts.iter().flatten())
+                .transactions_iter()
+                .zip(receipts.iter())
                 .map(move |(tx, receipt)| (block, tx, receipt))
         })
         // Get all logs from rollup contract

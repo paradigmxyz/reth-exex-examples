@@ -1,12 +1,12 @@
 use alloy_primitives::{address, Address};
 use alloy_sol_types::{sol, SolEventInterface};
 use futures::{Future, FutureExt, TryStreamExt};
-use reth::api::NodeTypes;
+use reth::api::{BlockBody, NodeTypes};
 use reth_execution_types::Chain;
 use reth_exex::{ExExContext, ExExEvent};
 use reth_node_api::FullNodeComponents;
 use reth_node_ethereum::EthereumNode;
-use reth_primitives::{EthPrimitives, Log, SealedBlockWithSenders, TransactionSigned};
+use reth_primitives::{Block, EthPrimitives, Log, RecoveredBlock, TransactionSigned};
 use reth_tracing::tracing::info;
 use rusqlite::Connection;
 
@@ -217,7 +217,7 @@ where
 /// [L1StandardBridgeEvents].
 fn decode_chain_into_events(
     chain: &Chain,
-) -> impl Iterator<Item = (&SealedBlockWithSenders, &TransactionSigned, &Log, L1StandardBridgeEvents)>
+) -> impl Iterator<Item = (&RecoveredBlock<Block>, &TransactionSigned, &Log, L1StandardBridgeEvents)>
 {
     chain
         // Get all blocks and receipts
@@ -226,9 +226,8 @@ fn decode_chain_into_events(
         .flat_map(|(block, receipts)| {
             block
                 .body()
-                .transactions
-                .iter()
-                .zip(receipts.iter().flatten())
+                .transactions_iter()
+                .zip(receipts.iter())
                 .map(move |(tx, receipt)| (block, tx, receipt))
         })
         // Get all logs from expected bridge contracts
@@ -283,11 +282,11 @@ mod tests {
     use alloy_eips::eip7685::Requests;
     use alloy_primitives::{Address, TxKind, U256};
     use alloy_sol_types::SolEvent;
-    use reth::revm::db::BundleState;
+    use reth::{api::Block as _, revm::db::BundleState};
     use reth_execution_types::{Chain, ExecutionOutcome};
     use reth_exex_test_utils::{test_exex_context, PollOnce};
     use reth_primitives::{
-        Block, BlockBody, BlockExt, Header, Log, Receipt, Transaction, TransactionSigned, TxType,
+        Block, BlockBody, Header, Log, Receipt, Transaction, TransactionSigned, TxType,
     };
     use reth_testing_utils::generators::sign_tx_with_random_key_pair;
     use rusqlite::Connection;
@@ -357,15 +356,15 @@ mod tests {
             body: BlockBody { transactions: vec![deposit_tx, withdrawal_tx], ..Default::default() },
         }
         .seal_slow()
-        .seal_with_senders::<Block>()
-        .ok_or_else(|| eyre::eyre!("failed to recover senders"))?;
+        .try_recover()
+        .unwrap();
 
         // Construct a chain
         let chain = Chain::new(
             vec![block.clone()],
             ExecutionOutcome::new(
                 BundleState::default(),
-                vec![deposit_tx_receipt, withdrawal_tx_receipt].into(),
+                vec![vec![deposit_tx_receipt, withdrawal_tx_receipt]],
                 block.number,
                 vec![Requests::default()],
             ),

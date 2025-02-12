@@ -5,23 +5,24 @@ use alloy_eips::{
 };
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_rlp::Decodable as _;
-use eyre::OptionExt;
-use reth::{core::primitives::SignedTransaction, transaction_pool::TransactionPool};
+use reth::{
+    api::Block as _, core::primitives::SignedTransaction, transaction_pool::TransactionPool,
+};
 use reth_execution_errors::BlockValidationError;
 use reth_node_api::{ConfigureEvm, ConfigureEvmEnv};
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{
-    Block, BlockBody, BlockExt, BlockWithSenders, EthereumHardfork, Header, Receipt,
-    TransactionSigned, TxType,
+    Block, BlockBody, EthereumHardfork, Header, Receipt, RecoveredBlock, TransactionSigned, TxType,
 };
 use reth_revm::{
     db::{states::bundle_state::BundleRetention, BundleState},
-    primitives::{CfgEnvWithHandlerCfg, EVMError, ExecutionResult, ResultAndState},
-    DBBox, DatabaseCommit, Evm, StateBuilder, StateDBBox,
+    primitives::{EVMError, ExecutionResult, ResultAndState},
+    DatabaseCommit, Evm, State, StateBuilder,
 };
 use reth_tracing::tracing::debug;
+use std::ops::DerefMut;
 
-/// Execute a rollup block and return (block with recovered senders)[BlockWithSenders], (bundle
+/// Execute a rollup block and return (block with recovered senders)[RecoveredBlock], (bundle
 /// state)[BundleState] and list of (receipts)[Receipt].
 pub async fn execute_block<Pool: TransactionPool>(
     db: &mut Database,
@@ -30,7 +31,7 @@ pub async fn execute_block<Pool: TransactionPool>(
     header: &Zenith::BlockHeader,
     block_data: Bytes,
     block_data_hash: B256,
-) -> eyre::Result<(BlockWithSenders, BundleState, Vec<Receipt>, Vec<ExecutionResult>)> {
+) -> eyre::Result<(RecoveredBlock<Block>, BundleState, Vec<Receipt>, Vec<ExecutionResult>)> {
     if header.rollupChainId != U256::from(CHAIN_ID) {
         eyre::bail!("Invalid rollup chain ID")
     }
@@ -43,7 +44,8 @@ pub async fn execute_block<Pool: TransactionPool>(
 
     // Configure EVM
     let evm_config = EthEvmConfig::new(CHAIN_SPEC.clone());
-    let mut evm = configure_evm(&evm_config, db, &header);
+    let mut evm = evm_config
+        .evm_for_block(StateBuilder::new_with_database(db).with_bundle_update().build(), &header);
 
     // Execute transactions
     let (executed_txs, receipts, results) = execute_transactions(&mut evm, &header, transactions)?;
@@ -51,10 +53,9 @@ pub async fn execute_block<Pool: TransactionPool>(
     // Construct block and recover senders
     let block =
         Block { header, body: BlockBody { transactions: executed_txs, ..Default::default() } }
-            .with_recovered_senders()
-            .ok_or_eyre("failed to recover senders")?;
+            .try_into_recovered()?;
 
-    let bundle = evm.db_mut().take_bundle();
+    let bundle = evm.deref_mut().db_mut().take_bundle();
 
     Ok((block, bundle, receipts, results))
 }
@@ -77,42 +78,20 @@ fn construct_header(db: &Database, header: &Zenith::BlockHeader) -> eyre::Result
             parent_block
                 .as_ref()
                 .ok_or(eyre::eyre!("parent block not found"))?
-                .header
+                .header()
                 .next_block_base_fee(CHAIN_SPEC.base_fee_params_at_block(block_number))
                 .ok_or(eyre::eyre!("failed to calculate base fee"))?
         };
 
     // Construct header
     Ok(Header {
-        parent_hash: parent_block.map(|block| block.header.hash()).unwrap_or_default(),
+        parent_hash: parent_block.map(|block| block.hash()).unwrap_or_default(),
         number: block_number,
         gas_limit: u64::try_from(header.gasLimit)?,
         timestamp: u64::try_from(header.confirmBy)?,
         base_fee_per_gas: Some(base_fee_per_gas),
         ..Default::default()
     })
-}
-
-/// Configure EVM with the given database and header.
-fn configure_evm<'a>(
-    config: &'a EthEvmConfig,
-    db: &'a mut Database,
-    header: &Header,
-) -> Evm<'a, (), StateDBBox<'a, eyre::Report>> {
-    let mut evm = config.evm(
-        StateBuilder::new_with_database(Box::new(db) as DBBox<'_, eyre::Report>)
-            .with_bundle_update()
-            .build(),
-    );
-    evm.db_mut().set_state_clear_flag(
-        CHAIN_SPEC.fork(EthereumHardfork::SpuriousDragon).active_at_block(header.number),
-    );
-
-    let mut cfg = CfgEnvWithHandlerCfg::new_with_spec_id(evm.cfg().clone(), evm.spec_id());
-    config.fill_cfg_and_block_env(&mut cfg, evm.block_mut(), header);
-    *evm.cfg_mut() = cfg.cfg_env;
-
-    evm
 }
 
 /// Decode transactions from the block data and recover senders.
@@ -127,13 +106,13 @@ async fn decode_transactions<Pool: TransactionPool>(
 ) -> eyre::Result<Vec<(TransactionSigned, Address)>> {
     // Get raw transactions either from the blobs, or directly from the block data
     let raw_transactions = if matches!(tx.tx_type(), TxType::Eip4844) {
-        let blobs: Vec<_> = if let Some(sidecar) = pool.get_blob(tx.hash())? {
+        let blobs: Vec<_> = if let Some(sidecar) = pool.get_blob(*tx.hash())? {
             // Try to get blobs from the transaction pool
             sidecar.blobs.clone().into_iter().zip(sidecar.commitments.clone()).collect()
         } else {
             // If transaction is not found in the pool, try to get blobs from Blobscan
             let blobscan_client = foundry_blob_explorers::Client::holesky();
-            let sidecar = blobscan_client.transaction(tx.hash()).await?.blob_sidecar();
+            let sidecar = blobscan_client.transaction(*tx.hash()).await?.blob_sidecar();
             sidecar
                 .blobs
                 .into_iter()
@@ -180,7 +159,7 @@ async fn decode_transactions<Pool: TransactionPool>(
     for raw_transaction in raw_transactions {
         let tx = TransactionSigned::decode_2718(&mut &raw_transaction[..])?;
         if tx.chain_id() == Some(CHAIN_ID) {
-            let sender = tx.recover_signer().ok_or(eyre::eyre!("failed to recover signer"))?;
+            let sender = tx.recover_signer()?;
             transactions.push((tx, sender));
         }
     }
@@ -190,8 +169,8 @@ async fn decode_transactions<Pool: TransactionPool>(
 
 /// Execute transactions and return the list of executed transactions, receipts and
 /// execution results.
-fn execute_transactions(
-    evm: &mut Evm<'_, (), StateDBBox<'_, eyre::Report>>,
+fn execute_transactions<DB: reth_revm::Database>(
+    evm: &mut Evm<'_, (), State<DB>>,
     header: &Header,
     transactions: Vec<(TransactionSigned, Address)>,
 ) -> eyre::Result<(Vec<TransactionSigned>, Vec<Receipt>, Vec<ExecutionResult>)> {
@@ -213,7 +192,7 @@ fn execute_transactions(
             }
             // Execute transaction.
             // Fill revm structure.
-            EthEvmConfig::new(CHAIN_SPEC.clone()).fill_tx_env(evm.tx_mut(), &transaction, sender);
+            *evm.tx_mut() = EthEvmConfig::new(CHAIN_SPEC.clone()).tx_env(&transaction, sender);
 
             let ResultAndState { result, state } = match evm.transact() {
                 Ok(result) => result,
@@ -224,9 +203,9 @@ fn execute_transactions(
                             debug!(%err, ?transaction, "Skipping invalid transaction");
                             continue;
                         }
-                        err => {
+                        _ => {
                             // this is an error that we should treat as fatal for this attempt
-                            eyre::bail!(err)
+                            eyre::bail!("db error")
                         }
                     }
                 }
@@ -245,7 +224,7 @@ fn execute_transactions(
                 tx_type: transaction.tx_type(),
                 success: result.is_success(),
                 cumulative_gas_used,
-                logs: result.logs().iter().cloned().map(Into::into).collect(),
+                logs: result.logs().to_vec(),
                 ..Default::default()
             });
 
@@ -269,7 +248,7 @@ mod tests {
     use alloy_eips::eip2718::Encodable2718;
     use alloy_primitives::{bytes, keccak256, BlockNumber, TxKind, U256};
     use alloy_sol_types::{sol, SolCall};
-    use reth_primitives::{public_key_to_address, Receipt, SealedBlockWithSenders, Transaction};
+    use reth_primitives::{public_key_to_address, Block, Receipt, RecoveredBlock, Transaction};
     use reth_revm::{
         primitives::{AccountInfo, ExecutionResult, Output, TxEnv},
         Evm,
@@ -428,7 +407,7 @@ mod tests {
         sequence: BlockNumber,
         tx: Transaction,
         block_data_source: BlockDataSource,
-    ) -> eyre::Result<(SealedBlockWithSenders, Vec<Receipt>, Vec<ExecutionResult>)> {
+    ) -> eyre::Result<(RecoveredBlock<Block>, Vec<Receipt>, Vec<ExecutionResult>)> {
         // Construct block header
         let block_header = BlockHeader {
             rollupChainId: U256::from(CHAIN_ID),
@@ -456,7 +435,7 @@ mod tests {
                 let mut mock_transaction = MockTransaction::eip4844_with_sidecar(sidecar);
                 let transaction =
                     sign_tx_with_key_pair(key_pair, Transaction::from(mock_transaction.clone()));
-                mock_transaction.set_hash(transaction.hash());
+                mock_transaction.set_hash(*transaction.hash());
                 pool.add_transaction(TransactionOrigin::Local, mock_transaction).await?;
                 (blob_hashes, transaction)
             }
@@ -472,7 +451,6 @@ mod tests {
             block_data_hash,
         )
         .await?;
-        let block = block.seal_slow();
         database.insert_block_with_bundle(&block, bundle)?;
 
         Ok((block, receipts, results))
