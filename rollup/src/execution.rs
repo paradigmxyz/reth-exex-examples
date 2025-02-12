@@ -22,7 +22,7 @@ use reth_revm::{
 use reth_tracing::tracing::debug;
 use std::ops::DerefMut;
 
-/// Execute a rollup block and return (block with recovered senders)[BlockWithSenders], (bundle
+/// Execute a rollup block and return (block with recovered senders)[RecoveredBlock], (bundle
 /// state)[BundleState] and list of (receipts)[Receipt].
 pub async fn execute_block<Pool: TransactionPool>(
     db: &mut Database,
