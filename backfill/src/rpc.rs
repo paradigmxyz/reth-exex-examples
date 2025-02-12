@@ -1,3 +1,4 @@
+use crate::BackfillMessage;
 use alloy_primitives::BlockNumber;
 use async_trait::async_trait;
 use jsonrpsee::{
@@ -6,8 +7,6 @@ use jsonrpsee::{
     types::{error::INTERNAL_ERROR_CODE, ErrorObject},
 };
 use tokio::sync::{mpsc, oneshot};
-
-use crate::BackfillMessage;
 
 #[rpc(server, namespace = "backfill")]
 trait BackfillRpcExtApi {

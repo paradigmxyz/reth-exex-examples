@@ -1,11 +1,5 @@
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    str::FromStr,
-    sync::{Arc, Mutex, MutexGuard},
-};
-
 use alloy_primitives::{Address, Bytes, B256, U256};
-use reth_primitives::{SealedBlockWithSenders, StorageEntry};
+use reth_primitives::{Block, RecoveredBlock, StorageEntry};
 use reth_provider::{bundle_state::StorageRevertsIter, OriginalValuesKnown};
 use reth_revm::{
     db::{
@@ -15,6 +9,13 @@ use reth_revm::{
     primitives::{AccountInfo, Bytecode},
 };
 use rusqlite::Connection;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    error::Error,
+    fmt::{Debug, Display, Formatter},
+    str::FromStr,
+    sync::{Arc, Mutex, MutexGuard},
+};
 
 /// Type used to initialize revms bundle state.
 type BundleStateInit =
@@ -88,7 +89,7 @@ impl Database {
     /// Insert block with bundle into the database.
     pub fn insert_block_with_bundle(
         &self,
-        block: &SealedBlockWithSenders,
+        block: &RecoveredBlock<Block>,
         bundle: BundleState,
     ) -> eyre::Result<()> {
         let mut connection = self.connection();
@@ -96,7 +97,7 @@ impl Database {
 
         tx.execute(
             "INSERT INTO block (number, data) VALUES (?, ?)",
-            (block.header.number.to_string(), serde_json::to_string(block)?),
+            (block.header().number.to_string(), serde_json::to_string(block)?),
         )?;
 
         let (changeset, reverts) = bundle.to_plain_state_and_reverts(OriginalValuesKnown::Yes);
@@ -119,7 +120,7 @@ impl Database {
             for (address, account) in account_reverts {
                 tx.execute(
                     "INSERT INTO account_revert (block_number, address, data) VALUES (?, ?, ?) ON CONFLICT(block_number, address) DO UPDATE SET data = excluded.data",
-                    (block.header.number.to_string(), address.to_string(), serde_json::to_string(&account)?),
+                    (block.header().number.to_string(), address.to_string(), serde_json::to_string(&account)?),
                 )?;
             }
         }
@@ -150,7 +151,7 @@ impl Database {
                 for (key, data) in StorageRevertsIter::new(storage, wiped_storage) {
                     tx.execute(
                     "INSERT INTO storage_revert (block_number, address, key, data) VALUES (?, ?, ?, ?) ON CONFLICT(block_number, address, key) DO UPDATE SET data = excluded.data",
-                    (block.header.number.to_string(), address.to_string(), key.to_string(), data.to_string()),
+                    (block.header().number.to_string(), address.to_string(), key.to_string(), data.to_string()),
                 )?;
                 }
             }
@@ -294,7 +295,7 @@ impl Database {
     }
 
     /// Get block by number.
-    pub fn get_block(&self, number: U256) -> eyre::Result<Option<SealedBlockWithSenders>> {
+    pub fn get_block(&self, number: U256) -> eyre::Result<Option<RecoveredBlock<Block>>> {
         let block = self.connection().query_row::<String, _, _>(
             "SELECT data FROM block WHERE number = ?",
             (number.to_string(),),
@@ -421,10 +422,10 @@ fn get_storage(connection: &Connection, address: Address, key: B256) -> eyre::Re
 }
 
 impl reth_revm::Database for Database {
-    type Error = eyre::Report;
+    type Error = RollUpDbError;
 
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
-        self.get_account(address)
+        Ok(self.get_account(address)?)
     }
 
     fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
@@ -436,12 +437,13 @@ impl reth_revm::Database for Database {
         match bytecode {
             Ok(data) => Ok(Bytecode::new_raw(Bytes::from_str(&data).unwrap())),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(Bytecode::default()),
-            Err(err) => Err(err.into()),
+            Err(err) => Err(RollUpDbError(err.into())),
         }
     }
 
     fn storage(&mut self, address: Address, index: U256) -> Result<U256, Self::Error> {
-        get_storage(&self.connection(), address, index.into()).map(|data| data.unwrap_or_default())
+        Ok(get_storage(&self.connection(), address, index.into())
+            .map(|data| data.unwrap_or_default())?)
     }
 
     fn block_hash(&mut self, number: u64) -> Result<B256, Self::Error> {
@@ -455,7 +457,29 @@ impl reth_revm::Database for Database {
             // No special handling for `QueryReturnedNoRows` is needed, because revm does block
             // number bound checks on its own.
             // See https://github.com/bluealloy/revm/blob/1ca3d39f6a9e9778f8eb0fcb74fe529345a531b4/crates/interpreter/src/instructions/host.rs#L106-L123.
-            Err(err) => Err(err.into()),
+            Err(err) => Err(RollUpDbError(err.into())),
         }
+    }
+}
+
+/// Error type for the database
+#[derive(Debug)]
+pub struct RollUpDbError(pub eyre::Error);
+
+impl Display for RollUpDbError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
+
+impl std::error::Error for RollUpDbError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.0.source()
+    }
+}
+
+impl From<eyre::Error> for RollUpDbError {
+    fn from(value: eyre::Report) -> Self {
+        Self(value)
     }
 }

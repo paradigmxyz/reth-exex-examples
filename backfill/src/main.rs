@@ -1,18 +1,16 @@
-mod rpc;
-
 use crate::rpc::{BackfillRpcExt, BackfillRpcExtApiServer};
 use alloy_primitives::BlockNumber;
 use clap::{Args, Parser};
 use eyre::OptionExt;
 use futures::{FutureExt, Stream, StreamExt, TryStreamExt};
 use jsonrpsee::tracing::instrument;
-use reth::{
-    api::NodeTypes,
-    chainspec::EthereumChainSpecParser,
-    primitives::EthPrimitives,
-    providers::BlockIdReader,
-    rpc::types::{BlockId, BlockNumberOrTag},
+use reth_ethereum::{
+    node::api::NodeTypes,
+    provider::BlockIdReader,
+    rpc::eth::primitives::{BlockId, BlockNumberOrTag},
+    EthPrimitives,
 };
+use reth_ethereum_cli::chainspec::EthereumChainSpecParser;
 use reth_execution_types::Chain;
 use reth_exex::{BackfillJob, BackfillJobFactory, ExExContext, ExExEvent, ExExNotification};
 use reth_node_api::FullNodeComponents;
@@ -20,6 +18,8 @@ use reth_node_ethereum::EthereumNode;
 use reth_tracing::tracing::{error, info};
 use std::{collections::HashMap, ops::RangeInclusive, sync::Arc};
 use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
+
+mod rpc;
 
 /// The message type used to communicate with the ExEx.
 enum BackfillMessage {
@@ -234,7 +234,7 @@ fn process_committed_chain(chain: &Chain) -> eyre::Result<()> {
     // Calculate the number of blocks and transactions in the committed chain
     let blocks = chain.blocks().len();
     let transactions =
-        chain.blocks().values().map(|block| block.transactions().len()).sum::<usize>();
+        chain.blocks().values().map(|block| block.transaction_count()).sum::<usize>();
 
     info!(first_block = %chain.execution_outcome().first_block, %blocks, %transactions, "Processed committed blocks");
     Ok(())
