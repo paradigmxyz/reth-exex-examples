@@ -17,7 +17,7 @@ reth-primitives.workspace = true
 reth-provider.workspace = true
 reth-revm.workspace = true
 reth-tracing.workspace = true
-reth.workspace = true
+reth-ethereum.workspace = true
 
 # alloy
 alloy-consensus = { workspace = true, features = ["k256"] }
