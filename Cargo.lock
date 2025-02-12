@@ -3732,7 +3732,7 @@ dependencies = [
  "alloy-consensus 0.11.1",
  "eyre",
  "futures-util",
- "reth-ethereum",
+ "reth",
  "reth-execution-types",
  "reth-exex",
  "reth-exex-test-utils",
