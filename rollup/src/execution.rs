@@ -366,6 +366,7 @@ mod tests {
                 gas_limit: 50_000_000,
                 kind: TxKind::Call(weth_address),
                 data: WETH::balanceOfCall::new((sender_address,)).abi_encode().into(),
+                nonce: 3,
                 ..Default::default()
             })
             .map_err(|err| eyre::eyre!(err))?
@@ -391,6 +392,7 @@ mod tests {
                 gas_limit: 50_000_000,
                 kind: TxKind::Call(weth_address),
                 data: WETH::balanceOfCall::new((sender_address,)).abi_encode().into(),
+                nonce: 2,
                 ..Default::default()
             })
             .map_err(|err| eyre::eyre!(err))?
