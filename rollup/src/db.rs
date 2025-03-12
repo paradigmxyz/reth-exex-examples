@@ -6,7 +6,7 @@ use reth_revm::{
         states::{PlainStorageChangeset, PlainStorageRevert},
         BundleState,
     },
-    primitives::{AccountInfo, Bytecode},
+    revm::state::{AccountInfo}
 };
 use rusqlite::Connection;
 use std::{
@@ -16,6 +16,8 @@ use std::{
     str::FromStr,
     sync::{Arc, Mutex, MutexGuard},
 };
+use reth_revm::db::DBErrorMarker;
+use reth_revm::state::Bytecode;
 
 /// Type used to initialize revms bundle state.
 type BundleStateInit =
@@ -483,3 +485,5 @@ impl From<eyre::Error> for RollUpDbError {
         Self(value)
     }
 }
+
+impl DBErrorMarker for RollUpDbError {}

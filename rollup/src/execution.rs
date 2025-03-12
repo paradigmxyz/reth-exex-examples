@@ -9,18 +9,18 @@ use reth::{
     api::Block as _, core::primitives::SignedTransaction, transaction_pool::TransactionPool,
 };
 use reth_execution_errors::BlockValidationError;
-use reth_node_api::{ConfigureEvm, ConfigureEvmEnv};
+use reth_node_api::{ConfigureEvm};
 use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::{
     Block, BlockBody, EthereumHardfork, Header, Receipt, RecoveredBlock, TransactionSigned, TxType,
 };
-use reth_revm::{
-    db::{states::bundle_state::BundleRetention, BundleState},
-    primitives::{EVMError, ExecutionResult, ResultAndState},
-    DatabaseCommit, Evm, State, StateBuilder,
-};
+use reth_revm::{db::{states::bundle_state::BundleRetention, BundleState}, DatabaseCommit, Inspector, State};
 use reth_tracing::tracing::debug;
 use std::ops::DerefMut;
+use reth_node_ethereum::evm::EthEvm;
+use reth_revm::context::result::ExecutionResult;
+use reth_revm::db::StateBuilder;
+use reth_revm::inspector::NoOpInspector;
 
 /// Execute a rollup block and return (block with recovered senders)[RecoveredBlock], (bundle
 /// state)[BundleState] and list of (receipts)[Receipt].
@@ -170,7 +170,7 @@ async fn decode_transactions<Pool: TransactionPool>(
 /// Execute transactions and return the list of executed transactions, receipts and
 /// execution results.
 fn execute_transactions<DB: reth_revm::Database>(
-    evm: &mut Evm<'_, (), State<DB>>,
+    evm: &mut EthEvm<State<DB>, NoOpInspector>,
     header: &Header,
     transactions: Vec<(TransactionSigned, Address)>,
 ) -> eyre::Result<(Vec<TransactionSigned>, Vec<Receipt>, Vec<ExecutionResult>)> {
@@ -249,10 +249,6 @@ mod tests {
     use alloy_primitives::{bytes, keccak256, BlockNumber, TxKind, U256};
     use alloy_sol_types::{sol, SolCall};
     use reth_primitives::{public_key_to_address, Block, Receipt, RecoveredBlock, Transaction};
-    use reth_revm::{
-        primitives::{AccountInfo, ExecutionResult, Output, TxEnv},
-        Evm,
-    };
     use reth_testing_utils::generators::{self, sign_tx_with_key_pair};
     use reth_transaction_pool::{
         test_utils::{testing_pool, MockTransaction},
@@ -261,6 +257,8 @@ mod tests {
     use rusqlite::Connection;
     use secp256k1::{Keypair, Secp256k1};
     use std::time::{SystemTime, UNIX_EPOCH};
+    use reth_revm::context::result::{ExecutionResult, Output};
+    use reth_revm::state::AccountInfo;
 
     sol!(
         WETH,

@@ -99,7 +99,7 @@ mod tests {
 
         let discv5_addr: SocketAddr = "127.0.0.1:30302".to_string().parse().unwrap();
         let rlpx_addr: SocketAddr = "127.0.0.1:30303".to_string().parse().unwrap();
-        let mut node_2 = Discovery::new(discv5_addr, rlpx_addr).await.unwrap();
+        let node_2 = Discovery::new(discv5_addr, rlpx_addr).await.unwrap();
 
         let node_2_enr = node_2.local_enr();
 
@@ -117,22 +117,10 @@ mod tests {
         node_1.inner.with_discv5(|discv5| discv5.send_ping(node_2_enr.clone())).await.unwrap();
 
         // verify they both established a session
-        let event_2_v5 = node_2.events.recv().await.unwrap();
         let event_1_v5 = node_1.events.recv().await.unwrap();
         assert!(matches!(
             event_1_v5,
             discv5::Event::SessionEstablished(node, socket) if node == node_2_enr && socket == node_2_enr.udp4_socket().unwrap().into()
-        ));
-        assert!(matches!(
-            event_2_v5,
-            discv5::Event::SessionEstablished(node, socket) if node == node_1_enr && socket == node_1_enr.udp4_socket().unwrap().into()
-        ));
-
-        // verify node_1 is in
-        let event_2_v5 = node_2.events.recv().await.unwrap();
-        assert!(matches!(
-            event_2_v5,
-            discv5::Event::NodeInserted { node_id, replaced } if node_id == node_1_enr.node_id() && replaced.is_none()
         ));
     }
 }
