@@ -3,24 +3,26 @@ use alloy_consensus::{Blob, SidecarCoder, SimpleCoder, Transaction};
 use alloy_eips::{
     eip1559::INITIAL_BASE_FEE, eip2718::Decodable2718, eip4844::kzg_to_versioned_hash,
 };
-use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
+use alloy_primitives::{keccak256, Bytes, B256, U256};
 use alloy_rlp::Decodable as _;
 use reth::{
     api::Block as _, core::primitives::SignedTransaction, transaction_pool::TransactionPool,
 };
+use reth_evm::Evm;
 use reth_execution_errors::BlockValidationError;
-use reth_node_api::{ConfigureEvm, ConfigureEvmEnv};
-use reth_node_ethereum::EthEvmConfig;
+use reth_node_api::ConfigureEvm;
+use reth_node_ethereum::{evm::EthEvm, EthEvmConfig};
 use reth_primitives::{
-    Block, BlockBody, EthereumHardfork, Header, Receipt, RecoveredBlock, TransactionSigned, TxType,
+    Block, BlockBody, EthereumHardfork, Header, Receipt, Recovered, RecoveredBlock,
+    TransactionSigned, TxType,
 };
 use reth_revm::{
-    db::{states::bundle_state::BundleRetention, BundleState},
-    primitives::{EVMError, ExecutionResult, ResultAndState},
-    DatabaseCommit, Evm, State, StateBuilder,
+    context::result::{EVMError, ExecutionResult, ResultAndState},
+    db::{states::bundle_state::BundleRetention, BundleState, StateBuilder},
+    inspector::NoOpInspector,
+    DatabaseCommit, State,
 };
 use reth_tracing::tracing::debug;
-use std::ops::DerefMut;
 
 /// Execute a rollup block and return (block with recovered senders)[RecoveredBlock], (bundle
 /// state)[BundleState] and list of (receipts)[Receipt].
@@ -55,7 +57,7 @@ pub async fn execute_block<Pool: TransactionPool>(
         Block { header, body: BlockBody { transactions: executed_txs, ..Default::default() } }
             .try_into_recovered()?;
 
-    let bundle = evm.deref_mut().db_mut().take_bundle();
+    let bundle = evm.db_mut().take_bundle();
 
     Ok((block, bundle, receipts, results))
 }
@@ -103,7 +105,7 @@ async fn decode_transactions<Pool: TransactionPool>(
     tx: &TransactionSigned,
     block_data: Bytes,
     block_data_hash: B256,
-) -> eyre::Result<Vec<(TransactionSigned, Address)>> {
+) -> eyre::Result<Vec<Recovered<TransactionSigned>>> {
     // Get raw transactions either from the blobs, or directly from the block data
     let raw_transactions = if matches!(tx.tx_type(), TxType::Eip4844) {
         let blobs: Vec<_> = if let Some(sidecar) = pool.get_blob(*tx.hash())? {
@@ -160,7 +162,7 @@ async fn decode_transactions<Pool: TransactionPool>(
         let tx = TransactionSigned::decode_2718(&mut &raw_transaction[..])?;
         if tx.chain_id() == Some(CHAIN_ID) {
             let sender = tx.recover_signer()?;
-            transactions.push((tx, sender));
+            transactions.push(tx.with_signer(sender));
         }
     }
 
@@ -169,17 +171,20 @@ async fn decode_transactions<Pool: TransactionPool>(
 
 /// Execute transactions and return the list of executed transactions, receipts and
 /// execution results.
-fn execute_transactions<DB: reth_revm::Database>(
-    evm: &mut Evm<'_, (), State<DB>>,
+fn execute_transactions<DB: reth_evm::Database>(
+    evm: &mut EthEvm<State<DB>, NoOpInspector>,
     header: &Header,
-    transactions: Vec<(TransactionSigned, Address)>,
-) -> eyre::Result<(Vec<TransactionSigned>, Vec<Receipt>, Vec<ExecutionResult>)> {
+    transactions: Vec<Recovered<TransactionSigned>>,
+) -> eyre::Result<(Vec<TransactionSigned>, Vec<Receipt>, Vec<ExecutionResult>)>
+where
+    DB::Error: Send,
+{
     let mut receipts = Vec::with_capacity(transactions.len());
     let mut executed_txs = Vec::with_capacity(transactions.len());
     let mut results = Vec::with_capacity(transactions.len());
     if !transactions.is_empty() {
         let mut cumulative_gas_used = 0;
-        for (transaction, sender) in transactions {
+        for transaction in transactions {
             // The sum of the transaction’s gas limit, Tg, and the gas utilized in this block prior,
             // must be no greater than the block’s gasLimit.
             let block_available_gas = header.gas_limit - cumulative_gas_used;
@@ -191,10 +196,7 @@ fn execute_transactions<DB: reth_revm::Database>(
                 .into());
             }
             // Execute transaction.
-            // Fill revm structure.
-            *evm.tx_mut() = EthEvmConfig::new(CHAIN_SPEC.clone()).tx_env(&transaction, sender);
-
-            let ResultAndState { result, state } = match evm.transact() {
+            let ResultAndState { result, state } = match evm.transact(&transaction) {
                 Ok(result) => result,
                 Err(err) => {
                     match err {
@@ -229,7 +231,7 @@ fn execute_transactions<DB: reth_revm::Database>(
             });
 
             // append transaction to the list of executed transactions
-            executed_txs.push(transaction);
+            executed_txs.push(transaction.into_inner());
             results.push(result);
         }
 
@@ -242,16 +244,22 @@ fn execute_transactions<DB: reth_revm::Database>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        db::Database, execute_block, Zenith::BlockHeader, CHAIN_ID, ROLLUP_SUBMITTER_ADDRESS,
+        db::Database, execute_block, Zenith::BlockHeader, CHAIN_ID, CHAIN_SPEC,
+        ROLLUP_SUBMITTER_ADDRESS,
     };
     use alloy_consensus::{constants::ETH_TO_WEI, SidecarBuilder, SimpleCoder, TxEip2930};
     use alloy_eips::eip2718::Encodable2718;
     use alloy_primitives::{bytes, keccak256, BlockNumber, TxKind, U256};
     use alloy_sol_types::{sol, SolCall};
+    use reth_evm::{ConfigureEvm, Evm};
+    use reth_node_ethereum::EthEvmConfig;
     use reth_primitives::{public_key_to_address, Block, Receipt, RecoveredBlock, Transaction};
     use reth_revm::{
-        primitives::{AccountInfo, ExecutionResult, Output, TxEnv},
-        Evm,
+        context::{
+            result::{ExecutionResult, Output},
+            TxEnv,
+        },
+        state::AccountInfo,
     };
     use reth_testing_utils::generators::{self, sign_tx_with_key_pair};
     use reth_transaction_pool::{
@@ -294,6 +302,7 @@ mod tests {
         reth_tracing::init_test_tracing();
 
         let mut database = Database::new(Connection::open_in_memory()?)?;
+        let evm_config = EthEvmConfig::new(CHAIN_SPEC.clone());
 
         // Create key pair
         let secp = Secp256k1::new();
@@ -350,17 +359,18 @@ mod tests {
         .await?;
 
         // Verify WETH balance
-        let mut evm = Evm::builder()
-            .with_db(&mut database)
-            .with_tx_env(TxEnv {
+        let mut evm = evm_config.evm_with_env(&mut database, Default::default());
+        let result = evm
+            .transact(TxEnv {
                 caller: sender_address,
                 gas_limit: 50_000_000,
-                transact_to: TxKind::Call(weth_address),
+                kind: TxKind::Call(weth_address),
                 data: WETH::balanceOfCall::new((sender_address,)).abi_encode().into(),
+                nonce: 3,
                 ..Default::default()
             })
-            .build();
-        let result = evm.transact().map_err(|err| eyre::eyre!(err))?.result;
+            .map_err(|err| eyre::eyre!(err))?
+            .result;
         assert_eq!(
             result.output(),
             Some(&U256::from(0.5 * ETH_TO_WEI as f64).to_be_bytes_vec().into())
@@ -375,17 +385,19 @@ mod tests {
         database.revert_tip_block(U256::from(1))?;
 
         // Verify WETH balance after revert
-        let mut evm = Evm::builder()
-            .with_db(&mut database)
-            .with_tx_env(TxEnv {
+        let mut evm = evm_config.evm_with_env(&mut database, Default::default());
+        let result = evm
+            .transact(TxEnv {
                 caller: sender_address,
                 gas_limit: 50_000_000,
-                transact_to: TxKind::Call(weth_address),
+                kind: TxKind::Call(weth_address),
                 data: WETH::balanceOfCall::new((sender_address,)).abi_encode().into(),
+                nonce: 2,
                 ..Default::default()
             })
-            .build();
-        let result = evm.transact().map_err(|err| eyre::eyre!(err))?.result;
+            .map_err(|err| eyre::eyre!(err))?
+            .result;
+
         assert_eq!(result.output(), Some(&U256::ZERO.to_be_bytes_vec().into()));
         drop(evm);
 

@@ -4,9 +4,10 @@ use reth_provider::{bundle_state::StorageRevertsIter, OriginalValuesKnown};
 use reth_revm::{
     db::{
         states::{PlainStorageChangeset, PlainStorageRevert},
-        BundleState,
+        BundleState, DBErrorMarker,
     },
-    primitives::{AccountInfo, Bytecode},
+    revm::state::AccountInfo,
+    state::Bytecode,
 };
 use rusqlite::Connection;
 use std::{
@@ -483,3 +484,5 @@ impl From<eyre::Error> for RollUpDbError {
         Self(value)
     }
 }
+
+impl DBErrorMarker for RollUpDbError {}

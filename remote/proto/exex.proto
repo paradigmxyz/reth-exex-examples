@@ -228,10 +228,9 @@ message ContractBytecode {
 
 message Bytecode {
   oneof bytecode {
-    bytes legacy_raw = 1;
-    LegacyAnalyzedBytecode legacy_analyzed = 2;
-    EofBytecode eof = 3;
-    Eip7702Bytecode eip7702 = 4;
+    LegacyAnalyzedBytecode legacy_analyzed = 1;
+    EofBytecode eof = 2;
+    Eip7702Bytecode eip7702 = 3;
   }
 }
 
