@@ -4,9 +4,10 @@ use reth_provider::{bundle_state::StorageRevertsIter, OriginalValuesKnown};
 use reth_revm::{
     db::{
         states::{PlainStorageChangeset, PlainStorageRevert},
-        BundleState,
+        BundleState, DBErrorMarker,
     },
-    revm::state::{AccountInfo}
+    revm::state::AccountInfo,
+    state::Bytecode,
 };
 use rusqlite::Connection;
 use std::{
@@ -16,8 +17,6 @@ use std::{
     str::FromStr,
     sync::{Arc, Mutex, MutexGuard},
 };
-use reth_revm::db::DBErrorMarker;
-use reth_revm::state::Bytecode;
 
 /// Type used to initialize revms bundle state.
 type BundleStateInit =
