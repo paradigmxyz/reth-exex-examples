@@ -9022,6 +9022,7 @@ dependencies = [
  "once_cell",
  "reth",
  "reth-chainspec",
+ "reth-evm",
  "reth-execution-errors",
  "reth-execution-types",
  "reth-exex",

@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 # reth
 reth-chainspec.workspace = true
+reth-evm.workspace = true
 reth-execution-errors.workspace = true
 reth-execution-types.workspace = true
 reth-exex.workspace = true
