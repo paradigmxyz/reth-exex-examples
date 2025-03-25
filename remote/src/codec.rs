@@ -876,6 +876,7 @@ impl TryFrom<&proto::Bytecode> for reth::revm::state::Bytecode {
                                 .map(|dest| *dest as u8)
                                 .collect::<Vec<_>>()
                                 .as_slice(),
+                            legacy_analyzed.jump_table.len(),
                         ),
                     ),
                 )
