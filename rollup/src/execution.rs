@@ -114,7 +114,7 @@ async fn decode_transactions<Pool: TransactionPool>(
         } else {
             // If transaction is not found in the pool, try to get blobs from Blobscan
             let blobscan_client = foundry_blob_explorers::Client::holesky();
-            let sidecar = blobscan_client.transaction(*tx.hash()).await?.blob_sidecar();
+            let sidecar = blobscan_client.transaction(tx.hash().0.into()).await?.blob_sidecar();
             sidecar
                 .blobs
                 .into_iter()

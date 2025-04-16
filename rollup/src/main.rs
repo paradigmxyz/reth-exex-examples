@@ -91,7 +91,7 @@ where
                     blockDataHash,
                     ..
                 }) => {
-                    let call = RollupContractCalls::abi_decode(tx.input(), true)?;
+                    let call = RollupContractCalls::abi_decode(tx.input())?;
 
                     if let RollupContractCalls::submitBlock(RollupContract::submitBlockCall {
                         header,
@@ -181,7 +181,7 @@ where
             match event {
                 // The block is reverted from the database.
                 RollupContractEvents::BlockSubmitted(_) => {
-                    let call = RollupContractCalls::abi_decode(tx.input(), true)?;
+                    let call = RollupContractCalls::abi_decode(tx.input())?;
 
                     if let RollupContractCalls::submitBlock(RollupContract::submitBlockCall {
                         header,
@@ -260,7 +260,7 @@ fn decode_chain_into_rollup_events(
         })
         // Decode and filter rollup events
         .filter_map(|(block, tx, log)| {
-            RollupContractEvents::decode_raw_log(log.topics(), &log.data.data, true)
+            RollupContractEvents::decode_raw_log(log.topics(), &log.data.data)
                 .ok()
                 .map(|event| (block, tx, event))
         })

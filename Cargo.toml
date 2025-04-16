@@ -20,41 +20,41 @@ publish = false
 
 [workspace.dependencies]
 # reth
-reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7", features = ["full"] }
-reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-ethereum-cli = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-discv5 = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-execution-errors = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-execution-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-exex = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7", features = ["serde"] }
-reth-eth-wire = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-evm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-network = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7", features = ["test-utils"] }
-reth-network-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-network-peers = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-node-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-primitives = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-provider = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-revm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-tracing = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
+reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10", features = ["full"] }
+reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-ethereum-cli = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-discv5 = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-execution-errors = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-execution-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-exex = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10", features = ["serde"] }
+reth-eth-wire = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-evm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-network = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10", features = ["test-utils"] }
+reth-network-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-network-peers = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-node-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-provider = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-tracing = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
 
 # alloy
-alloy-eips = { version = "0.13", default-features = false }
-alloy-genesis = { version = "0.13", default-features = false }
-alloy-consensus = { version = "0.13", default-features = false }
+alloy-eips = { version = "0.14", default-features = false }
+alloy-genesis = { version = "0.14", default-features = false }
+alloy-consensus = { version = "0.14", default-features = false }
 alloy-rlp = "0.3.4"
-alloy-rpc-types = { version = "0.13", features = [
+alloy-rpc-types = { version = "0.14", features = [
     "eth",
 ], default-features = false }
-alloy-signer = { version = "0.13", default-features = false }
-alloy-signer-local = { version = "0.13", default-features = false }
+alloy-signer = { version = "0.14", default-features = false }
+alloy-signer-local = { version = "0.14", default-features = false }
 
-alloy-primitives = { version = "0.8", default-features = false }
-alloy-sol-types  = { version = "0.8", features = ["json"] }
-foundry-blob-explorers = "0.12"
+alloy-primitives = { version = "1.0", default-features = false }
+alloy-sol-types  = { version = "1.0", features = ["json"] }
+foundry-blob-explorers = "0.13"
 
 discv5 = "0.9"
 enr = "0.13"
@@ -77,8 +77,8 @@ serde_json = "1"
 eyre = "0.6"
 
 # testing
-reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
-reth-testing-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.7" }
+reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
+reth-testing-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }
 
 
 #[patch.crates-io]
