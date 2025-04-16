@@ -240,7 +240,7 @@ fn decode_chain_into_events(
         })
         // Decode and filter bridge events
         .filter_map(|(block, tx, log)| {
-            L1StandardBridgeEvents::decode_raw_log(log.topics(), &log.data.data, true)
+            L1StandardBridgeEvents::decode_raw_log(log.topics(), &log.data.data)
                 .ok()
                 .map(|event| (block, tx, log, event))
         })
@@ -313,7 +313,7 @@ mod tests {
             logs: vec![log],
             ..Default::default()
         };
-        Ok((sign_tx_with_random_key_pair(&mut rand::thread_rng(), tx), receipt))
+        Ok((sign_tx_with_random_key_pair(&mut rand::rng(), tx), receipt))
     }
 
     #[tokio::test]

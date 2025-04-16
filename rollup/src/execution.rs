@@ -114,7 +114,7 @@ async fn decode_transactions<Pool: TransactionPool>(
         } else {
             // If transaction is not found in the pool, try to get blobs from Blobscan
             let blobscan_client = foundry_blob_explorers::Client::holesky();
-            let sidecar = blobscan_client.transaction(*tx.hash()).await?.blob_sidecar();
+            let sidecar = blobscan_client.transaction(tx.hash().0.into()).await?.blob_sidecar();
             sidecar
                 .blobs
                 .into_iter()
@@ -267,7 +267,7 @@ mod tests {
         TransactionOrigin, TransactionPool,
     };
     use rusqlite::Connection;
-    use secp256k1::{Keypair, Secp256k1};
+    use secp256k1::Keypair;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     sol!(
@@ -305,8 +305,7 @@ mod tests {
         let evm_config = EthEvmConfig::new(CHAIN_SPEC.clone());
 
         // Create key pair
-        let secp = Secp256k1::new();
-        let key_pair = Keypair::new(&secp, &mut generators::rng());
+        let key_pair = generators::generate_key(&mut generators::rng());
         let sender_address = public_key_to_address(key_pair.public_key());
 
         // Deposit some ETH to the sender and insert it into database

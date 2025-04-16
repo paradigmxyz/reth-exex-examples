@@ -636,7 +636,7 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
     fn try_from(transaction: &proto::Transaction) -> Result<Self, Self::Error> {
         let hash = TxHash::try_from(transaction.hash.as_slice())?;
         let signature = transaction.signature.as_ref().ok_or_eyre("no signature")?;
-        let signature = alloy_primitives::PrimitiveSignature::new(
+        let signature = alloy_primitives::Signature::new(
             U256::try_from_le_slice(signature.r.as_slice()).ok_or_eyre("failed to parse r")?,
             U256::try_from_le_slice(signature.s.as_slice()).ok_or_eyre("failed to parse s")?,
             signature.y_parity,
@@ -782,7 +782,7 @@ impl TryFrom<&proto::Transaction> for reth::primitives::TransactionSigned {
                     .map(|authorization| {
                         let signature =
                             authorization.signature.as_ref().ok_or_eyre("no signature")?;
-                        let signature = alloy_primitives::PrimitiveSignature::new(
+                        let signature = alloy_primitives::Signature::new(
                             U256::try_from_le_slice(signature.r.as_slice())
                                 .ok_or_eyre("failed to parse r")?,
                             U256::try_from_le_slice(signature.s.as_slice())
