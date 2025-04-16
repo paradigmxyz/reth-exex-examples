@@ -75,6 +75,7 @@ serde_json = "1"
 
 # misc
 eyre = "0.6"
+rand = "0.9"
 
 # testing
 reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.10" }

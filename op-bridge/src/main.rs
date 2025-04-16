@@ -313,7 +313,7 @@ mod tests {
             logs: vec![log],
             ..Default::default()
         };
-        Ok((sign_tx_with_random_key_pair(&mut rand::thread_rng(), tx), receipt))
+        Ok((sign_tx_with_random_key_pair(&mut rand::rng(), tx), receipt))
     }
 
     #[tokio::test]

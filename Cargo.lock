@@ -5553,7 +5553,7 @@ dependencies = [
  "alloy-sol-types 1.0.0",
  "eyre",
  "futures",
- "rand 0.8.5",
+ "rand 0.9.0",
  "reth",
  "reth-evm",
  "reth-execution-types",
