@@ -46,7 +46,7 @@ pub async fn execute_block<Pool: TransactionPool>(
     // Configure EVM
     let evm_config = EthEvmConfig::new(CHAIN_SPEC.clone());
     let mut evm = evm_config
-        .evm_for_block(StateBuilder::new_with_database(db).with_bundle_update().build(), &header);
+        .evm_for_block(StateBuilder::new_with_database(db).with_bundle_update().build(), &header)?;
 
     // Execute transactions
     let (executed_txs, receipts, results) = execute_transactions(&mut evm, &header, transactions)?;
@@ -70,6 +70,7 @@ fn construct_header(db: &Database, header: &Zenith::BlockHeader) -> eyre::Result
     };
 
     let block_number = u64::try_from(header.sequence)?;
+    let timestamp = u64::try_from(header.confirmBy)?;
 
     // Calculate base fee per gas for EIP-1559 transactions
     let base_fee_per_gas =
@@ -80,7 +81,7 @@ fn construct_header(db: &Database, header: &Zenith::BlockHeader) -> eyre::Result
                 .as_ref()
                 .ok_or(eyre::eyre!("parent block not found"))?
                 .header()
-                .next_block_base_fee(CHAIN_SPEC.base_fee_params_at_block(block_number))
+                .next_block_base_fee(CHAIN_SPEC.base_fee_params_at_timestamp(timestamp))
                 .ok_or(eyre::eyre!("failed to calculate base fee"))?
         };
 
@@ -89,7 +90,7 @@ fn construct_header(db: &Database, header: &Zenith::BlockHeader) -> eyre::Result
         parent_hash: parent_block.map(|block| block.hash()).unwrap_or_default(),
         number: block_number,
         gas_limit: u64::try_from(header.gasLimit)?,
-        timestamp: u64::try_from(header.confirmBy)?,
+        timestamp,
         base_fee_per_gas: Some(base_fee_per_gas),
         ..Default::default()
     })
