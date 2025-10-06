@@ -351,7 +351,7 @@ impl TryFrom<&reth::revm::bytecode::Bytecode> for proto::Bytecode {
                 proto::bytecode::Bytecode::LegacyAnalyzed(proto::LegacyAnalyzedBytecode {
                     bytecode: legacy_analyzed.bytecode().to_vec(),
                     original_len: legacy_analyzed.original_len() as u64,
-                    jump_table: legacy_analyzed.jump_table().as_slice().iter().copied().collect(),
+                    jump_table: legacy_analyzed.jump_table().as_slice().to_vec(),
                     jump_table_len: legacy_analyzed.jump_table().len() as u64,
                 })
             }
@@ -862,12 +862,7 @@ impl TryFrom<&proto::Bytecode> for reth::revm::state::Bytecode {
                         legacy_analyzed.bytecode.clone().into(),
                         legacy_analyzed.original_len as usize,
                         reth::revm::state::bytecode::JumpTable::from_slice(
-                            legacy_analyzed
-                                .jump_table
-                                .iter()
-                                .copied()
-                                .collect::<Vec<_>>()
-                                .as_slice(),
+                            legacy_analyzed.jump_table.to_vec().as_slice(),
                             legacy_analyzed.jump_table_len as usize,
                         ),
                     ),
