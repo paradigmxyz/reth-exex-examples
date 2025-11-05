@@ -1,9 +1,9 @@
 use alloy_primitives::{Address, Bytes, B256, U256};
 use reth_primitives::{Block, RecoveredBlock, StorageEntry};
-use reth_provider::{bundle_state::StorageRevertsIter, OriginalValuesKnown};
+use reth_provider::OriginalValuesKnown;
 use reth_revm::{
     db::{
-        states::{PlainStorageChangeset, PlainStorageRevert},
+        states::{reverts::RevertToSlot, PlainStorageChangeset, PlainStorageRevert},
         BundleState, DBErrorMarker,
     },
     revm::state::AccountInfo,
@@ -149,11 +149,22 @@ impl Database {
                     .into_iter()
                     .map(|(k, v)| (B256::new(k.to_be_bytes()), v))
                     .collect::<Vec<_>>();
-                let wiped_storage = if wiped { get_storages(&tx, address)? } else { Vec::new() };
-                for (key, data) in StorageRevertsIter::new(storage, wiped_storage) {
+                let wiped_storage = if wiped {
+                    get_storages(&tx, address)?
+                        .into_iter()
+                        .map(|(k, v)| (k, RevertToSlot::Some(v)))
+                        .collect::<Vec<_>>()
+                } else {
+                    Vec::new()
+                };
+                for (key, data) in storage.into_iter().chain(wiped_storage.into_iter()) {
+                    let data_str = match data {
+                        RevertToSlot::Some(value) => value.to_string(),
+                        RevertToSlot::Destroyed => "destroyed".to_string(),
+                    };
                     tx.execute(
                     "INSERT INTO storage_revert (block_number, address, key, data) VALUES (?, ?, ?, ?) ON CONFLICT(block_number, address, key) DO UPDATE SET data = excluded.data",
-                    (block.header().number.to_string(), address.to_string(), key.to_string(), data.to_string()),
+                    (block.header().number.to_string(), address.to_string(), key.to_string(), data_str),
                 )?;
                 }
             }
@@ -230,14 +241,19 @@ impl Database {
             .query((block_number.to_string(),))?
             .mapped(|row| {
                 Ok((
-                    Address::from_str(row.get_ref(0)?.as_str()?),
-                    B256::from_str(row.get_ref(1)?.as_str()?),
-                    U256::from_str(row.get_ref(2)?.as_str()?),
+                    row.get_ref(0)?.as_str()?.to_string(),
+                    row.get_ref(1)?.as_str()?.to_string(),
+                    row.get_ref(2)?.as_str()?.to_string(),
                 ))
             })
             .map(|result| {
-                let (address, key, data) = result?;
-                Ok((address?, key?, data?))
+                let (address_str, key_str, data_str) = result?;
+                let data = if data_str == "destroyed" {
+                    U256::ZERO
+                } else {
+                    U256::from_str(&data_str)?
+                };
+                Ok((Address::from_str(&address_str)?, B256::from_str(&key_str)?, data))
             })
             .collect::<eyre::Result<Vec<_>>>()?;
 

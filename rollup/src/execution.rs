@@ -46,7 +46,7 @@ pub async fn execute_block<Pool: TransactionPool>(
     // Configure EVM
     let evm_config = EthEvmConfig::new(CHAIN_SPEC.clone());
     let mut evm = evm_config
-        .evm_for_block(StateBuilder::new_with_database(db).with_bundle_update().build(), &header);
+        .evm_for_block(StateBuilder::new_with_database(db).with_bundle_update().build(), &header)?;
 
     // Execute transactions
     let (executed_txs, receipts, results) = execute_transactions(&mut evm, &header, transactions)?;
@@ -80,7 +80,7 @@ fn construct_header(db: &Database, header: &Zenith::BlockHeader) -> eyre::Result
                 .as_ref()
                 .ok_or(eyre::eyre!("parent block not found"))?
                 .header()
-                .next_block_base_fee(CHAIN_SPEC.base_fee_params_at_block(block_number))
+                .next_block_base_fee(CHAIN_SPEC.base_fee_params_at_timestamp(block_number))
                 .ok_or(eyre::eyre!("failed to calculate base fee"))?
         };
 
