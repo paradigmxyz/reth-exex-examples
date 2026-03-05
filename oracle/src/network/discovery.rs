@@ -3,7 +3,6 @@
 use discv5::{enr::secp256k1::rand, Enr, Event, ListenConfig};
 use reth::network::config::SecretKey;
 use reth_discv5::{enr::EnrCombinedKeyWrapper, Config, Discv5};
-use reth_network_peers::NodeRecord;
 use reth_tracing::tracing::info;
 use std::{
     future::Future,
@@ -17,8 +16,6 @@ use tokio::sync::mpsc;
 pub(crate) struct Discovery {
     /// The inner discv5 instance.
     inner: Discv5,
-    /// The node record of the discv5 instance.
-    node_record: NodeRecord,
     /// The events stream of the discv5 instance.
     events: mpsc::Receiver<discv5::Event>,
 }
@@ -36,8 +33,8 @@ impl Discovery {
             .discv5_config(discv5::ConfigBuilder::new(config).build())
             .build();
 
-        let (discv5, events, node_record) = Discv5::start(&secret_key, discv5_config).await?;
-        Ok(Self { inner: discv5, events, node_record })
+        let (discv5, events) = Discv5::start(&secret_key, discv5_config).await?;
+        Ok(Self { inner: discv5, events })
     }
 
     /// Adds a node to the table if its not already present.

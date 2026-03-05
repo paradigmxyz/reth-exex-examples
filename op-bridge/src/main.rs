@@ -290,7 +290,7 @@ mod tests {
     };
     use reth_testing_utils::generators::sign_tx_with_random_key_pair;
     use rusqlite::Connection;
-    use std::pin::pin;
+    use std::{collections::BTreeMap, pin::pin};
 
     /// Given the address of a bridge contract and an event, construct a transaction signed with a
     /// random private key and a receipt for that transaction.
@@ -368,7 +368,7 @@ mod tests {
                 block.number,
                 vec![Requests::default()],
             ),
-            None,
+            BTreeMap::new(),
         );
 
         // Send a notification that the chain has been committed

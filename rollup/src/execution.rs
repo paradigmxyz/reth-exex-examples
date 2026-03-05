@@ -263,6 +263,7 @@ mod tests {
     use reth_evm::{ConfigureEvm, Evm};
     use reth_node_ethereum::EthEvmConfig;
     use reth_primitives::{public_key_to_address, Block, Receipt, RecoveredBlock, Transaction};
+    use reth_primitives_traits::constants::MAX_TX_GAS_LIMIT_OSAKA;
     use reth_revm::{
         context::{
             result::{ExecutionResult, Output},
@@ -371,7 +372,7 @@ mod tests {
         let result = evm
             .transact(TxEnv {
                 caller: sender_address,
-                gas_limit: 50_000_000,
+                gas_limit: MAX_TX_GAS_LIMIT_OSAKA,
                 kind: TxKind::Call(weth_address),
                 data: WETH::balanceOfCall::new((sender_address,)).abi_encode().into(),
                 nonce: 3,
@@ -397,7 +398,7 @@ mod tests {
         let result = evm
             .transact(TxEnv {
                 caller: sender_address,
-                gas_limit: 50_000_000,
+                gas_limit: MAX_TX_GAS_LIMIT_OSAKA,
                 kind: TxKind::Call(weth_address),
                 data: WETH::balanceOfCall::new((sender_address,)).abi_encode().into(),
                 nonce: 2,
@@ -448,7 +449,7 @@ mod tests {
                 sign_tx_with_key_pair(key_pair, Transaction::Eip2930(TxEip2930::default())),
             ),
             BlockDataSource::Blobs => {
-                let sidecar =
+                let sidecar: alloy_consensus::BlobTransactionSidecar =
                     SidecarBuilder::<SimpleCoder>::from_slice(&encoded_transactions).build()?;
                 let blob_hashes = alloy_rlp::encode(sidecar.versioned_hashes().collect::<Vec<_>>());
 

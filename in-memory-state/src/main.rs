@@ -86,7 +86,7 @@ mod tests {
     use reth_execution_types::{Chain, ExecutionOutcome};
     use reth_exex_test_utils::{test_exex_context, PollOnce};
     use reth_testing_utils::generators::{self, random_block, random_receipt, BlockParams};
-    use std::pin::pin;
+    use std::{collections::BTreeMap, pin::pin};
 
     #[tokio::test]
     async fn test_exex() -> eyre::Result<()> {
@@ -115,7 +115,11 @@ mod tests {
         // Send a notification to the Execution Extension that the chain with the first block has
         // been committed
         handle
-            .send_notification_chain_committed(Chain::new(vec![block_1], execution_outcome1, None))
+            .send_notification_chain_committed(Chain::new(
+                vec![block_1],
+                execution_outcome1,
+                BTreeMap::new(),
+            ))
             .await?;
         exex.poll_once().await?;
 
@@ -138,7 +142,7 @@ mod tests {
 
         // Send a notification to the Execution Extension that the chain with the second block has
         // been committed
-        let chain_2 = Chain::new(vec![block_2], execution_outcome2, None);
+        let chain_2 = Chain::new(vec![block_2], execution_outcome2, BTreeMap::new());
         handle.send_notification_chain_committed(chain_2.clone()).await?;
         exex.poll_once().await?;
 
