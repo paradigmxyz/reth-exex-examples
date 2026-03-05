@@ -56,7 +56,9 @@ fn main() -> eyre::Result<()> {
 mod tests {
     use reth_execution_types::{Chain, ExecutionOutcome};
     use reth_exex_test_utils::{test_exex_context, PollOnce};
-    use std::pin::pin;
+    use reth_trie::{updates::TrieUpdatesSorted, HashedPostStateSorted};
+    use reth_trie_common::LazyTrieData;
+    use std::{pin::pin, sync::Arc};
 
     #[tokio::test]
     async fn test_exex() -> eyre::Result<()> {
@@ -71,7 +73,10 @@ mod tests {
             .send_notification_chain_committed(Chain::from_block(
                 handle.genesis.clone(),
                 ExecutionOutcome::default(),
-                None,
+                LazyTrieData::ready(
+                    Arc::new(HashedPostStateSorted::default()),
+                    Arc::new(TrieUpdatesSorted::default()),
+                ),
             ))
             .await?;
 

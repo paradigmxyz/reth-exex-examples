@@ -2,7 +2,7 @@ use crate::proto;
 use alloy_primitives::{Address, BlockHash, Bloom, TxHash, B256, B64, U256};
 use eyre::OptionExt;
 use reth::primitives::Block;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 impl TryFrom<&reth_exex::ExExNotification> for proto::ExExNotification {
     type Error = eyre::Error;
@@ -545,7 +545,7 @@ impl TryFrom<&proto::Chain> for reth::providers::Chain {
                 first_block: execution_outcome.first_block,
                 requests: Default::default(),
             },
-            None,
+            BTreeMap::new(),
         ))
     }
 }
@@ -845,6 +845,7 @@ impl TryFrom<&proto::AccountInfo> for reth::revm::state::AccountInfo {
 
     fn try_from(account_info: &proto::AccountInfo) -> Result<Self, Self::Error> {
         Ok(reth::revm::state::AccountInfo {
+            account_id: None,
             balance: U256::try_from_le_slice(account_info.balance.as_slice())
                 .ok_or_eyre("failed to parse balance")?,
             nonce: account_info.nonce,
@@ -860,7 +861,7 @@ impl TryFrom<&proto::Bytecode> for reth::revm::state::Bytecode {
     fn try_from(bytecode: &proto::Bytecode) -> Result<Self, Self::Error> {
         Ok(match bytecode.bytecode.as_ref().ok_or_eyre("no bytecode")? {
             proto::bytecode::Bytecode::LegacyAnalyzed(legacy_analyzed) => {
-                reth::revm::state::Bytecode::LegacyAnalyzed(
+                reth::revm::state::Bytecode::LegacyAnalyzed(Arc::new(
                     reth::revm::state::bytecode::LegacyAnalyzedBytecode::new(
                         legacy_analyzed.bytecode.clone().into(),
                         legacy_analyzed.original_len as usize,
@@ -869,14 +870,14 @@ impl TryFrom<&proto::Bytecode> for reth::revm::state::Bytecode {
                             legacy_analyzed.jump_table_len as usize,
                         ),
                     ),
-                )
+                ))
             }
             proto::bytecode::Bytecode::Eip7702(eip7702) => reth::revm::bytecode::Bytecode::Eip7702(
-                reth::revm::bytecode::eip7702::Eip7702Bytecode {
+                Arc::new(reth::revm::bytecode::eip7702::Eip7702Bytecode {
                     delegated_address: Address::try_from(eip7702.delegated_address.as_slice())?,
                     version: eip7702.version as u8,
                     raw: eip7702.raw.as_slice().to_vec().into(),
-                },
+                }),
             ),
         })
     }

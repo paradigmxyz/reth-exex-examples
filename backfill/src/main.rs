@@ -162,7 +162,7 @@ where
         let backfill_tx = self.backfill_tx.clone();
 
         // Spawn the backfill job in a separate task
-        self.ctx.task_executor().spawn(async move {
+        self.ctx.task_executor().spawn_task(async move {
             Self::backfill(permit, job_id, job, backfill_tx, cancel_rx).await
         });
 

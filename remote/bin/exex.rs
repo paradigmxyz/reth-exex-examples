@@ -72,7 +72,7 @@ fn main() -> eyre::Result<()> {
             .launch_with_debug_capabilities()
             .await?;
 
-        handle.node.task_executor.spawn_critical("gRPC server", async move {
+        handle.node.task_executor.spawn_critical_task("gRPC server", async move {
             server.await.expect("gRPC server crashed")
         });
 
